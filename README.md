@@ -20,7 +20,7 @@ The app searches common Battle.net, Wine, Faugus and Steam prefixes. A manual Wo
 
 Upload tokens go into the OS keyring. If unavailable, the app retains the token only in memory until it quits. Preferences contain local folder paths and character UUIDs, but no upload token. App downloads and signed update artifacts are hosted on GitHub Releases.
 
-**Linux:** use the **AppImage** for built-in automatic updates. The optional `.deb` is a smaller download that relies on installed system libraries and must be updated manually by installing a newer package. The initial `.deb` interface still shows the updater controls; those cannot install a Linux package update. [Upstream updater formats](https://v2.tauri.app/plugin/updater/#building).
+**Linux:** the small `.deb` uses installed WebKitGTK libraries; the larger AppImage includes more runtime libraries for portability. The pinned updater **2.14.0 supports both formats**, including native DEB installation through `dpkg`. A system-installed DEB update can require an administrator authorization prompt; an AppImage in your writable applications folder normally does not. [Pinned updater implementation](https://docs.rs/crate/tauri-plugin-updater/2.14.0/source/src/updater.rs).
 
 ## What the numbers mean
 
