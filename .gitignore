@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+data/
+.env*
+.secrets/
+desktop/target/
+desktop/node_modules/
+*.sqlite3*
+
+desktop/src-tauri/icons/android/
+desktop/src-tauri/icons/ios/
