@@ -68,3 +68,13 @@ def test_body_limits_and_duplicate_keys(api):
     assert api.post('/api/imports',content='{"a":1,"a":2}',headers={'Content-Type':'application/json'}).status_code==400
     assert api.post('/api/imports',content='{"a":NaN}',headers={'Content-Type':'application/json'}).status_code==400
     assert api.post('/api/imports',content='print(123)').status_code==415
+
+def test_visibility_change_does_not_duplicate_snapshot(api,sample):
+    assert api.post('/api/imports',json=sample).status_code==200
+    sample.update(privacy='named',name='Tester',realm='Test Realm')
+    assert api.post('/api/imports',json=sample).json()['status']=='duplicate'
+    assert len(api.get('/api/stats').json()['contributors'])==1
+    sample.update(privacy='anonymous');sample.pop('name');sample.pop('realm')
+    assert api.post('/api/imports',json=sample).json()['status']=='duplicate'
+    data=api.get('/api/stats').json()
+    assert data['contributors']==[] and data['rows'][0]['procs']==2

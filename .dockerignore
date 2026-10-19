@@ -1,0 +1,7 @@
+*
+!requirements.txt
+!server/
+!server/*.py
+!server/catalog.json
+!web/
+!web/**
