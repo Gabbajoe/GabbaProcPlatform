@@ -14,6 +14,13 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 p = argparse.ArgumentParser()
+
+
+def require(condition, message):
+    if not condition:
+        raise SystemExit(message)
+
+
 p.add_argument("directory", type=Path)
 p.add_argument("--minisign", default="minisign")
 a = p.parse_args()
@@ -24,11 +31,11 @@ config = json.loads(
     ).read_text()
 )
 manifest = json.loads((root / "latest.json").read_text())
-assert manifest["version"].removeprefix("v") == config["version"], "Version mismatch"
+require(manifest["version"].removeprefix("v") == config["version"], "Version mismatch")
 platforms = manifest["platforms"]
 required = {"darwin-aarch64", "darwin-x86_64", "windows-x86_64", "linux-x86_64"}
-assert required <= platforms.keys(), "Missing operating system or architecture"
-assert len(platforms) <= 20, "Unexpected manifest size"
+require(required <= platforms.keys(), "Missing operating system or architecture")
+require(len(platforms) <= 20, "Unexpected manifest size")
 verified = {}
 with tempfile.TemporaryDirectory() as temp:
     public = Path(temp) / "updater.pub"
@@ -40,28 +47,35 @@ with tempfile.TemporaryDirectory() as temp:
         prefix = (
             "/Gabbajoe/GabbaProcPlatform/releases/download/v" + config["version"] + "/"
         )
-        assert (
+        require(
             url.scheme == "https"
             and url.netloc == "github.com"
-            and url.path.startswith(prefix)
-        ), "Unexpected download origin"
-        assert not url.query and not url.fragment, "Unexpected URL parameters"
+            and url.path.startswith(prefix),
+            "Unexpected download origin",
+        )
+        require(not url.query and (not url.fragment), "Unexpected URL parameters")
         name = unquote(url.path[len(prefix) :])
-        assert (
-            name and Path(name).name == name and "/" not in name and "\\" not in name
-        ), "Unsafe asset name"
+        require(
+            name
+            and Path(name).name == name
+            and ("/" not in name)
+            and ("\\" not in name),
+            "Unsafe asset name",
+        )
         asset = root / name
-        assert (
+        require(
             asset.is_file()
-            and not asset.is_symlink()
-            and asset.stat().st_size <= 200_000_000
-        ), "Asset missing or too large"
+            and (not asset.is_symlink())
+            and (asset.stat().st_size <= 200000000),
+            "Asset missing or too large",
+        )
         signature = item["signature"]
-        assert signature == (root / (name + ".sig")).read_text().strip(), (
-            "Manifest signature differs from asset"
+        require(
+            signature == (root / (name + ".sig")).read_text().strip(),
+            "Manifest signature differs from asset",
         )
         if name in verified:
-            assert verified[name] == signature, "Conflicting signatures"
+            require(verified[name] == signature, "Conflicting signatures")
             continue
         sig = Path(temp) / "update.minisig"
         sig.write_bytes(base64.b64decode(signature, validate=True))
@@ -74,10 +88,7 @@ with tempfile.TemporaryDirectory() as temp:
         print("Verified:", name)
 checksums = []
 for asset in sorted(root.iterdir()):
-    if (
-        asset.name.endswith((".exe", ".dmg", ".deb", ".AppImage", ".tar.gz"))
-        and asset.name != "tampered.exe"
-    ):
+    if asset.name.endswith((".exe", ".dmg", ".deb", ".AppImage", ".tar.gz")):
         checksums.append(
             hashlib.sha256(asset.read_bytes()).hexdigest() + "  " + asset.name
         )
