@@ -1,1 +1,12 @@
-{"identifier":"main","description":"Local companion UI","windows":["main"],"permissions":["core:default","dialog:allow-open","updater:default","process:allow-restart","autostart:default"]}
+{
+  "identifier": "main",
+  "description": "Local companion UI",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "updater:default",
+    "process:allow-restart",
+    "autostart:default"
+  ]
+}

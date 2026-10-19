@@ -1,22 +1,260 @@
-'use strict';
-const {invoke}=window.__TAURI__.core;
-const $=id=>document.getElementById(id);
-const de={tag:'Kleine App. Gemeinsame Erkenntnisse.',connect:'1 · Verbinden',tokenHelp:'Mit einer Einladung des Betreibers erhältst du auf gabbaproc.kellerkind.info einen Upload-Token. Er wird im System-Schlüsselbund gespeichert, andernfalls nur für diese Sitzung.',token:'Upload-Token',save:'Token speichern',characters:'2 · Charaktere auswählen',help:'Im Addon exportieren (/gpt export), danach /reload oder ausloggen. Nur ausgewählte Charaktere werden hochgeladen. Anonyme Uploads nutzen eine dauerhafte pseudonyme ID.',scan:'WoW suchen',folder:'WoW-Ordner auswählen',sync:'3 · Synchronisieren',auto:'Geänderte Exporte automatisch jede Minute hochladen',startup:'Bei der Anmeldung starten',updates:'Signierte App-Updates automatisch installieren (App startet neu)',running:'Automatische Uploads laufen, solange die App geöffnet ist. Das Schließen des Fensters beendet die App. Frühere Kopien öffentlich sichtbarer Namen können nicht zurückgerufen werden.',upload:'Ausgewählte Charaktere hochladen',update:'Nach Updates suchen',preview:'Upload-Vorschau',deleteTitle:'Meine gespendeten Daten löschen',deleteHelp:'Löscht alle Daten dieses Upload-Tokens und sperrt ihn. Danach brauchst du eine neue Einladung.',delete:'Daten endgültig löschen',source:'Quellcode & Releases: github.com/Gabbajoe/GabbaProcPlatform'};
-const original=new Map([...document.querySelectorAll('[data-t]')].map(el=>[el,el.textContent]));
-let lang=localStorage.getItem('language')||(navigator.language.startsWith('de')?'de':'en');
-function text(en,ger){return lang==='de'?ger:en}function language(){document.documentElement.lang=lang;$('lang').value=lang;for(const [el,en]of original)el.textContent=lang==='de'?de[el.dataset.t]||en:en;localStorage.setItem('language',lang)}
-function status(v){$('status').textContent=typeof v==='string'?v:JSON.stringify(v,null,2)}
-async function run(f){try{return await f()}catch(e){status(String(e))}}
-async function overview(){const s=await invoke('overview');$('auto').checked=s.autoUpload;$('credential').textContent=s.hasToken?(s.persistentToken?text('Saved in keyring','Im Schlüsselbund gespeichert'):text('Session only','Nur diese Sitzung')):text('No token','Kein Token');return s}
-async function scan(){const rows=await invoke('discover');$('characters').replaceChildren();for(const row of rows){const box=document.createElement('div');box.className='character';if(row.error){box.textContent=text(row.error,'Export fehlt oder ist ungültig. In WoW exportieren und /reload ausführen.');$('characters').append(box);continue}const enabled=document.createElement('input');enabled.type='checkbox';enabled.checked=row.choice.enabled;const named=document.createElement('input');named.type='checkbox';named.checked=row.choice.named;const label=document.createElement('label');label.append(enabled,document.createTextNode(`${row.localName} · ${row.id.slice(0,8)} · ${row.rows} ${text('measurements','Messwerte')}`));const label2=document.createElement('label');label2.append(named,document.createTextNode(text('Publish character name and realm','Charaktername und Realm veröffentlichen')));async function choose(){await invoke('set_choice',{id:row.id,enabled:enabled.checked,named:named.checked})}enabled.onchange=named.onchange=()=>run(choose);const preview=document.createElement('button');preview.textContent=text('Preview','Vorschau');preview.onclick=()=>run(async()=>{$('preview').textContent=JSON.stringify(await invoke('preview',{id:row.id}),null,2);$('preview').parentElement.open=true});const hide=document.createElement('button');hide.textContent=text('Hide previously published name','Bisher veröffentlichten Namen ausblenden');hide.onclick=()=>run(async()=>{await invoke('hide_name',{id:row.id});await scan();status(text('Name hidden; character uploads paused.','Name ausgeblendet; Uploads dieses Charakters pausiert.'))});box.append(label,label2,preview,hide);$('characters').append(box)}if(!rows.length)$('characters').textContent=text('No exports found. Choose your WoW folder and export in the addon.','Keine Exporte gefunden. WoW-Ordner wählen und im Addon exportieren.')}
-$('lang').onchange=()=>{lang=$('lang').value;language();run(scan)};
-$('scan').onclick=()=>run(scan);
-$('folder').onclick=()=>run(async()=>{const path=await window.__TAURI__.dialog.open({directory:true,multiple:false});if(path){await invoke('add_root',{path});await scan()}});
-$('saveToken').onclick=()=>run(async()=>{await invoke('set_token',{token:$('token').value.trim()});$('token').value='';await overview()});
-$('auto').onchange=()=>run(()=>invoke('set_auto',{enabled:$('auto').checked}));
-$('startup').onchange=()=>run(async()=>{if($('startup').checked)await window.__TAURI__.autostart.enable();else await window.__TAURI__.autostart.disable()});
-$('upload').onclick=()=>run(async()=>{const s=await overview();if(s.busy)return;status(text('Uploading…','Upload läuft…'));status(await invoke('sync_now'));await overview()});
-$('delete').onclick=()=>run(async()=>{if(!confirm(text('Permanently delete all your contributed data and revoke this token?','Alle deine hochgeladenen Daten endgültig löschen und diesen Token sperren?')))return;await invoke('delete_data');await overview();await scan();status(text('Deleted. Token revoked.','Gelöscht. Token gesperrt.'))});
-let updating=false;async function update(manual){if(updating)return;updating=true;try{const s=await overview();if(s.busy)return;const u=await window.__TAURI__.updater.check();if(!u){if(manual)status(text('App is up to date.','App ist aktuell.'));return}if(!manual&&!$('updates').checked)return;if(manual&&!confirm(text(`Install signed update ${u.version} and restart?`,`Signiertes Update ${u.version} installieren und neu starten?`)))return;status(text('Installing signed update…','Signiertes Update wird installiert…'));await u.downloadAndInstall();await window.__TAURI__.process.relaunch()}finally{updating=false}}
-$('updates').checked=localStorage.getItem('autoUpdates')==='true';$('updates').onchange=()=>{localStorage.setItem('autoUpdates',String($('updates').checked));if($('updates').checked)run(()=>update(false))};$('update').onclick=()=>run(()=>update(true));
-language();run(async()=>{await overview();await scan();$('startup').checked=await window.__TAURI__.autostart.isEnabled();if($('updates').checked)await update(false)});setInterval(()=>run(async()=>{const s=await overview();if(s.status&&!s.busy)status(s.status)}),10000);setInterval(()=>{if($('updates').checked)run(()=>update(false))},6*60*60*1000);
+"use strict";
+const { invoke } = window.__TAURI__.core;
+const $ = (id) => document.getElementById(id);
+const de = {
+  tag: "Kleine App. Gemeinsame Erkenntnisse.",
+  connect: "1 · Verbinden",
+  tokenHelp:
+    "Mit einer Einladung des Betreibers erhältst du auf gabbaproc.kellerkind.info einen Upload-Token. Er wird im System-Schlüsselbund gespeichert, andernfalls nur für diese Sitzung.",
+  token: "Upload-Token",
+  save: "Token speichern",
+  characters: "2 · Charaktere auswählen",
+  help: "Im Addon exportieren (/gpt export), danach /reload oder ausloggen. Nur ausgewählte Charaktere werden hochgeladen. Anonyme Uploads nutzen eine dauerhafte pseudonyme ID.",
+  scan: "WoW suchen",
+  folder: "WoW-Ordner auswählen",
+  sync: "3 · Synchronisieren",
+  auto: "Geänderte Exporte automatisch jede Minute hochladen",
+  startup: "Bei der Anmeldung starten",
+  updates: "Signierte App-Updates automatisch installieren (App startet neu)",
+  running:
+    "Automatische Uploads laufen, solange die App geöffnet ist. Das Schließen des Fensters beendet die App. Frühere Kopien öffentlich sichtbarer Namen können nicht zurückgerufen werden.",
+  upload: "Ausgewählte Charaktere hochladen",
+  update: "Nach Updates suchen",
+  preview: "Upload-Vorschau",
+  deleteTitle: "Meine gespendeten Daten löschen",
+  deleteHelp:
+    "Löscht alle Daten dieses Upload-Tokens und sperrt ihn. Danach brauchst du eine neue Einladung.",
+  delete: "Daten endgültig löschen",
+  source: "Quellcode & Releases: github.com/Gabbajoe/GabbaProcPlatform",
+};
+const original = new Map(
+  [...document.querySelectorAll("[data-t]")].map((el) => [el, el.textContent]),
+);
+let lang =
+  localStorage.getItem("language") ||
+  (navigator.language.startsWith("de") ? "de" : "en");
+function text(en, ger) {
+  return lang === "de" ? ger : en;
+}
+function language() {
+  document.documentElement.lang = lang;
+  $("lang").value = lang;
+  for (const [el, en] of original)
+    el.textContent = lang === "de" ? de[el.dataset.t] || en : en;
+  localStorage.setItem("language", lang);
+}
+function status(v) {
+  $("status").textContent =
+    typeof v === "string" ? v : JSON.stringify(v, null, 2);
+}
+async function run(f) {
+  try {
+    return await f();
+  } catch (e) {
+    status(String(e));
+  }
+}
+async function overview() {
+  const s = await invoke("overview");
+  $("auto").checked = s.autoUpload;
+  $("credential").textContent = s.hasToken
+    ? s.persistentToken
+      ? text("Saved in keyring", "Im Schlüsselbund gespeichert")
+      : text("Session only", "Nur diese Sitzung")
+    : text("No token", "Kein Token");
+  return s;
+}
+async function scan() {
+  const rows = await invoke("discover");
+  $("characters").replaceChildren();
+  for (const row of rows) {
+    const box = document.createElement("div");
+    box.className = "character";
+    if (row.error) {
+      box.textContent = text(
+        row.error,
+        "Export fehlt oder ist ungültig. In WoW exportieren und /reload ausführen.",
+      );
+      $("characters").append(box);
+      continue;
+    }
+    const enabled = document.createElement("input");
+    enabled.type = "checkbox";
+    enabled.checked = row.choice.enabled;
+    const named = document.createElement("input");
+    named.type = "checkbox";
+    named.checked = row.choice.named;
+    const label = document.createElement("label");
+    label.append(
+      enabled,
+      document.createTextNode(
+        `${row.localName} · ${row.id.slice(0, 8)} · ${row.rows} ${text("measurements", "Messwerte")}`,
+      ),
+    );
+    const label2 = document.createElement("label");
+    label2.append(
+      named,
+      document.createTextNode(
+        text(
+          "Publish character name and realm",
+          "Charaktername und Realm veröffentlichen",
+        ),
+      ),
+    );
+    async function choose() {
+      await invoke("set_choice", {
+        id: row.id,
+        enabled: enabled.checked,
+        named: named.checked,
+      });
+    }
+    enabled.onchange = named.onchange = () => run(choose);
+    const preview = document.createElement("button");
+    preview.textContent = text("Preview", "Vorschau");
+    preview.onclick = () =>
+      run(async () => {
+        $("preview").textContent = JSON.stringify(
+          await invoke("preview", { id: row.id }),
+          null,
+          2,
+        );
+        $("preview").parentElement.open = true;
+      });
+    const hide = document.createElement("button");
+    hide.textContent = text(
+      "Hide previously published name",
+      "Bisher veröffentlichten Namen ausblenden",
+    );
+    hide.onclick = () =>
+      run(async () => {
+        await invoke("hide_name", { id: row.id });
+        await scan();
+        status(
+          text(
+            "Name hidden; character uploads paused.",
+            "Name ausgeblendet; Uploads dieses Charakters pausiert.",
+          ),
+        );
+      });
+    box.append(label, label2, preview, hide);
+    $("characters").append(box);
+  }
+  if (!rows.length)
+    $("characters").textContent = text(
+      "No exports found. Choose your WoW folder and export in the addon.",
+      "Keine Exporte gefunden. WoW-Ordner wählen und im Addon exportieren.",
+    );
+}
+$("lang").onchange = () => {
+  lang = $("lang").value;
+  language();
+  run(scan);
+};
+$("scan").onclick = () => run(scan);
+$("folder").onclick = () =>
+  run(async () => {
+    const path = await window.__TAURI__.dialog.open({
+      directory: true,
+      multiple: false,
+    });
+    if (path) {
+      await invoke("add_root", { path });
+      await scan();
+    }
+  });
+$("saveToken").onclick = () =>
+  run(async () => {
+    await invoke("set_token", { token: $("token").value.trim() });
+    $("token").value = "";
+    await overview();
+  });
+$("auto").onchange = () =>
+  run(() => invoke("set_auto", { enabled: $("auto").checked }));
+$("startup").onchange = () =>
+  run(async () => {
+    if ($("startup").checked) await window.__TAURI__.autostart.enable();
+    else await window.__TAURI__.autostart.disable();
+  });
+$("upload").onclick = () =>
+  run(async () => {
+    const s = await overview();
+    if (s.busy) return;
+    status(text("Uploading…", "Upload läuft…"));
+    status(await invoke("sync_now"));
+    await overview();
+  });
+$("delete").onclick = () =>
+  run(async () => {
+    if (
+      !confirm(
+        text(
+          "Permanently delete all your contributed data and revoke this token?",
+          "Alle deine hochgeladenen Daten endgültig löschen und diesen Token sperren?",
+        ),
+      )
+    )
+      return;
+    await invoke("delete_data");
+    await overview();
+    await scan();
+    status(text("Deleted. Token revoked.", "Gelöscht. Token gesperrt."));
+  });
+let updating = false;
+async function update(manual) {
+  if (updating) return;
+  updating = true;
+  try {
+    const s = await overview();
+    if (s.busy) return;
+    const u = await window.__TAURI__.updater.check();
+    if (!u) {
+      if (manual) status(text("App is up to date.", "App ist aktuell."));
+      return;
+    }
+    if (!manual && !$("updates").checked) return;
+    if (
+      manual &&
+      !confirm(
+        text(
+          `Install signed update ${u.version} and restart?`,
+          `Signiertes Update ${u.version} installieren und neu starten?`,
+        ),
+      )
+    )
+      return;
+    status(
+      text("Installing signed update…", "Signiertes Update wird installiert…"),
+    );
+    await u.downloadAndInstall();
+    await window.__TAURI__.process.relaunch();
+  } finally {
+    updating = false;
+  }
+}
+$("updates").checked = localStorage.getItem("autoUpdates") === "true";
+$("updates").onchange = () => {
+  localStorage.setItem("autoUpdates", String($("updates").checked));
+  if ($("updates").checked) run(() => update(false));
+};
+$("update").onclick = () => run(() => update(true));
+language();
+run(async () => {
+  await overview();
+  await scan();
+  $("startup").checked = await window.__TAURI__.autostart.isEnabled();
+  if ($("updates").checked) await update(false);
+});
+setInterval(
+  () =>
+    run(async () => {
+      const s = await overview();
+      if (s.status && !s.busy) status(s.status);
+    }),
+  10000,
+);
+setInterval(
+  () => {
+    if ($("updates").checked) run(() => update(false));
+  },
+  6 * 60 * 60 * 1000,
+);

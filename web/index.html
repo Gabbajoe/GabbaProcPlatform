@@ -1,8 +1,295 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GabbaProc · Community proc observatory</title><meta name="description" content="Compare community proc observations from WoW Classic Era and Hardcore. Open source, transparent uploads, English and German."><link rel="icon" href="/assets/logo.png"><link rel="stylesheet" href="/assets/site.css"><script src="/assets/site.js" defer></script></head><body>
-<header><a class="brand" href="#"><img src="/assets/logo.png" alt=""><span>GABBA<span class="gold">PROC</span><small data-i="observatory">COMMUNITY OBSERVATORY</small></span></a><nav><a href="#data" data-i="explore">Explore data</a><a href="#contribute" data-i="contribute">Contribute</a><a href="#transparency" data-i="transparency">Transparency</a><button id="language" aria-label="Switch language">DE</button></nav></header>
-<main><section class="hero"><div><p class="eyebrow" data-i="era">CLASSIC ERA / HARDCORE · OPEN COMMUNITY DATA</p><h1 data-i="hero">Every proc.<br>Part of a bigger picture.</h1><p class="intro" data-i="intro">Collect your observations. Compare Open World, dungeons and raids. Help build a dataset we can all inspect.</p><div class="actions"><a class="button primary" href="#data" data-i="explore">Explore data</a><a class="button" href="#contribute" data-i="join">Add your observations ↗</a></div><p class="quiet" data-i="disclaimer">Community observations — not verified combat logs or proof of different proc chances.</p></div><img class="hero-icon" src="/assets/logo.png" alt="Golden medallion with a turquoise lightning bolt and statistics bars"></section>
-<section class="metrics" aria-label="Dataset summary"><article><span data-i="contributors">Contributors</span><strong id="contributors">—</strong></article><article><span data-i="collections">Measurement collections</span><strong id="collections">—</strong></article><article><span data-i="effects">Observed effects</span><strong id="effects">—</strong></article><article><span data-i="updated">Last received</span><strong id="updated" class="small">—</strong></article></section>
-<section id="data"><div class="section-title"><div><p class="eyebrow" data-i="dataset">THE DATASET</p><h2 data-i="compare">Compare the observations</h2></div><button id="refresh" data-i="refresh">Refresh</button></div><div class="filters"><label><span data-i="search">Effect name or spell ID</span><input id="search" type="search" placeholder="Crusader, Ironfoe, 20007…"></label><label><span data-i="area">Area</span><select id="area"><option value="all" data-i="all">All areas</option><option value="world">Open World</option><option value="party" data-i="dungeons">Dungeons</option><option value="raid" data-i="raids">Raids</option></select></label><label><span data-i="minimum">Minimum combat minutes</span><input id="minimum" type="number" min="0" value="0" step="1"></label><button id="csv" data-i="csv">Export visible CSV</button></div><p id="status" role="status" aria-live="polite"></p><div class="table-scroll"><table><thead><tr><th data-i="effect">Effect</th><th data-i="area">Area</th><th data-i="procs">Total procs</th><th data-i="combat">Combat minutes</th><th data-i="rate">Procs / combat minute</th><th data-i="contributors">Contributors</th></tr></thead><tbody id="rows"></tbody></table></div><p class="quiet" data-i="weighted">Rates use total combat procs ÷ total combat time. Zero-proc fights count. Exposure can overlap across effects; it is not unique playtime.</p><div class="notice"><strong data-i="interpretTitle">A higher bar is an observation, not a verdict.</strong><p data-i="interpret">Attack speed, targets, equipment and ability choices influence rates. This version does not count eligible hits, estimate proc probability or calculate confidence intervals. Extreme rates are quarantined, but plausible fabricated numbers cannot be reliably detected.</p></div></section>
-<section id="contribute"><p class="eyebrow" data-i="contribute">CONTRIBUTE</p><h2 data-i="joinTitle">Your next proc can help.</h2><div class="cards"><article><span class="step">01</span><h3 data-i="install">Install the addon</h3><p data-i="installText">GabbaProcTracker records your own effects. The companion reads only the saved export after a reload or logout.</p><a href="https://github.com/Gabbajoe/GabbaProcTracker/releases" rel="noopener" data-i="addon">Get the addon ↗</a></article><article><span class="step">02</span><h3 data-i="companion">Connect the companion</h3><p data-i="companionText">Find WoW automatically, choose characters and enable uploads. App packages and signed updates are hosted on GitHub.</p><a href="https://github.com/Gabbajoe/GabbaProcPlatform/releases" rel="noopener" data-i="app">Companion downloads ↗</a></article><article><span class="step">03</span><h3 data-i="choice">Choose what you share</h3><p data-i="choiceText">Without names is the default. You can explicitly share your character name and realm. Uploading is optional and can be paused.</p><a href="#transparency" data-i="details">See the exact data policy ↓</a></article></div><div class="enrollment"><h3 data-i="pilot">Join the initial data collection</h3><p data-i="pilotText">The first version uses single-use operator invitations to limit abuse. Enter your invitation to receive an upload token. Paste it into the companion; never post it publicly.</p><form id="enroll"><label><span data-i="invitation">Invitation</span><input id="invite" type="password" autocomplete="off" maxlength="100" required></label><button class="primary" data-i="activate">Activate invitation</button></form><p id="enroll-status" role="status"></p><label id="token-box" hidden><span data-i="token">Your upload token — shown once</span><input id="token" type="text" readonly autocomplete="off"><button id="copy-token" type="button" data-i="copy">Copy token</button></label></div></section>
-<section id="transparency"><p class="eyebrow" data-i="open">OPEN SOURCE. EXPLICIT CHOICES.</p><h2 data-i="transparentTitle">Know exactly what leaves your computer.</h2><div class="cards"><article><h3 data-i="sent">What is sent</h3><p data-i="sentText">Effect IDs, area groups, counters, combat exposure, retained segment data, export time and persistent collection/character identifiers. Name and realm only in named mode. No account folder names, local paths, chat, inventory or entire SavedVariables file.</p></article><article><h3 data-i="anonymous">Without names ≠ untraceable</h3><p data-i="anonymousText">Persistent identifiers make these data pseudonymous. IP addresses are processed for network delivery and abuse limits. Named contributions can reveal a character's identity. Removing a name cannot erase copies someone already downloaded.</p></article><article><h3 data-i="trust">How data are checked</h3><p data-i="trustText">Lua is parsed as data, never executed. The server checks sizes, known effects, counters, ownership and duplicate snapshots. Public statistics include accepted community submissions, not independently verified gameplay. Suspicious data are withheld.</p></article></div><details><summary data-i="storage">Storage, deletion and limitations</summary><p data-i="storageText">We retain the latest cumulative totals and up to 301 supplied history segments per collection. The public API does not expose character UUIDs, device tokens or detailed timestamps. A valid device token can hide stored names or delete its contributions and revoke itself. Contact the operator for device transfer. History gaps remain possible. Authentication tokens are stored hashed on the server. The app prefers the system keychain and does not silently fall back to a plaintext token file.</p></details><div class="actions"><a class="button" href="https://github.com/Gabbajoe/GabbaProcPlatform" data-i="source">Read website & app source ↗</a><a class="button" href="https://github.com/Gabbajoe/GabbaProcPlatform/issues" data-i="feedback">Questions & issues ↗</a></div></section>
-<section><h2 data-i="named">Contributors who chose to share their name</h2><div id="names" class="name-list"></div></section></main><footer><span>GabbaProc · Community data for Classic Era / Hardcore</span><a href="https://github.com/Gabbajoe/GabbaProcPlatform/blob/main/LICENSE">MIT · Source</a><a href="https://nilskeller.de/seiten/Impressum.html" data-i="legal">Operator / legal notice</a></footer></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>GabbaProc · Community proc observatory</title>
+    <meta
+      name="description"
+      content="Compare community proc observations from WoW Classic Era and Hardcore. Open source, transparent uploads, English and German."
+    />
+    <link rel="icon" href="/assets/logo.png" />
+    <link rel="stylesheet" href="/assets/site.css" />
+    <script src="/assets/site.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="#"
+        ><img src="/assets/logo.png" alt="" /><span
+          >GABBA<span class="gold">PROC</span
+          ><small data-i="observatory">COMMUNITY OBSERVATORY</small></span
+        ></a
+      >
+      <nav>
+        <a href="#data" data-i="explore">Explore data</a
+        ><a href="#contribute" data-i="contribute">Contribute</a
+        ><a href="#transparency" data-i="transparency">Transparency</a
+        ><button id="language" aria-label="Switch language">DE</button>
+      </nav>
+    </header>
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow" data-i="era">
+            CLASSIC ERA / HARDCORE · OPEN COMMUNITY DATA
+          </p>
+          <h1 data-i="hero">Every proc.<br />Part of a bigger picture.</h1>
+          <p class="intro" data-i="intro">
+            Collect your observations. Compare Open World, dungeons and raids.
+            Help build a dataset we can all inspect.
+          </p>
+          <div class="actions">
+            <a class="button primary" href="#data" data-i="explore"
+              >Explore data</a
+            ><a class="button" href="#contribute" data-i="join"
+              >Add your observations ↗</a
+            >
+          </div>
+          <p class="quiet" data-i="disclaimer">
+            Community observations — not verified combat logs or proof of
+            different proc chances.
+          </p>
+        </div>
+        <img
+          class="hero-icon"
+          src="/assets/logo.png"
+          alt="Golden medallion with a turquoise lightning bolt and statistics bars"
+        />
+      </section>
+      <section class="metrics" aria-label="Dataset summary">
+        <article>
+          <span data-i="contributors">Contributors</span
+          ><strong id="contributors">—</strong>
+        </article>
+        <article>
+          <span data-i="collections">Measurement collections</span
+          ><strong id="collections">—</strong>
+        </article>
+        <article>
+          <span data-i="effects">Observed effects</span
+          ><strong id="effects">—</strong>
+        </article>
+        <article>
+          <span data-i="updated">Last received</span
+          ><strong id="updated" class="small">—</strong>
+        </article>
+      </section>
+      <section id="data">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow" data-i="dataset">THE DATASET</p>
+            <h2 data-i="compare">Compare the observations</h2>
+          </div>
+          <button id="refresh" data-i="refresh">Refresh</button>
+        </div>
+        <div class="filters">
+          <label
+            ><span data-i="search">Effect name or spell ID</span
+            ><input
+              id="search"
+              type="search"
+              placeholder="Crusader, Ironfoe, 20007…" /></label
+          ><label
+            ><span data-i="area">Area</span
+            ><select id="area">
+              <option value="all" data-i="all">All areas</option>
+              <option value="world">Open World</option>
+              <option value="party" data-i="dungeons">Dungeons</option>
+              <option value="raid" data-i="raids">Raids</option>
+            </select></label
+          ><label
+            ><span data-i="minimum">Minimum combat minutes</span
+            ><input
+              id="minimum"
+              type="number"
+              min="0"
+              value="0"
+              step="1" /></label
+          ><button id="csv" data-i="csv">Export visible CSV</button>
+        </div>
+        <p id="status" role="status" aria-live="polite"></p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th data-i="effect">Effect</th>
+                <th data-i="area">Area</th>
+                <th data-i="procs">Total procs</th>
+                <th data-i="combat">Combat minutes</th>
+                <th data-i="rate">Procs / combat minute</th>
+                <th data-i="contributors">Contributors</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <p class="quiet" data-i="weighted">
+          Rates use total combat procs ÷ total combat time. Zero-proc fights
+          count. Exposure can overlap across effects; it is not unique playtime.
+        </p>
+        <div class="notice">
+          <strong data-i="interpretTitle"
+            >A higher bar is an observation, not a verdict.</strong
+          >
+          <p data-i="interpret">
+            Attack speed, targets, equipment and ability choices influence
+            rates. This version does not count eligible hits, estimate proc
+            probability or calculate confidence intervals. Extreme rates are
+            quarantined, but plausible fabricated numbers cannot be reliably
+            detected.
+          </p>
+        </div>
+      </section>
+      <section id="contribute">
+        <p class="eyebrow" data-i="contribute">CONTRIBUTE</p>
+        <h2 data-i="joinTitle">Your next proc can help.</h2>
+        <div class="cards">
+          <article>
+            <span class="step">01</span>
+            <h3 data-i="install">Install the addon</h3>
+            <p data-i="installText">
+              GabbaProcTracker records your own effects. The companion reads
+              only the saved export after a reload or logout.
+            </p>
+            <a
+              href="https://github.com/Gabbajoe/GabbaProcTracker/releases"
+              rel="noopener"
+              data-i="addon"
+              >Get the addon ↗</a
+            >
+          </article>
+          <article>
+            <span class="step">02</span>
+            <h3 data-i="companion">Connect the companion</h3>
+            <p data-i="companionText">
+              Find WoW automatically, choose characters and enable uploads. App
+              packages and signed updates are hosted on GitHub.
+            </p>
+            <a
+              href="https://github.com/Gabbajoe/GabbaProcPlatform/releases"
+              rel="noopener"
+              data-i="app"
+              >Companion downloads ↗</a
+            >
+          </article>
+          <article>
+            <span class="step">03</span>
+            <h3 data-i="choice">Choose what you share</h3>
+            <p data-i="choiceText">
+              Without names is the default. You can explicitly share your
+              character name and realm. Uploading is optional and can be paused.
+            </p>
+            <a href="#transparency" data-i="details"
+              >See the exact data policy ↓</a
+            >
+          </article>
+        </div>
+        <div class="enrollment">
+          <h3 data-i="pilot">Join the initial data collection</h3>
+          <p data-i="pilotText">
+            The first version uses single-use operator invitations to limit
+            abuse. Enter your invitation to receive an upload token. Paste it
+            into the companion; never post it publicly.
+          </p>
+          <form id="enroll">
+            <label
+              ><span data-i="invitation">Invitation</span
+              ><input
+                id="invite"
+                type="password"
+                autocomplete="off"
+                maxlength="100"
+                required /></label
+            ><button class="primary" data-i="activate">
+              Activate invitation
+            </button>
+          </form>
+          <p id="enroll-status" role="status"></p>
+          <label id="token-box" hidden
+            ><span data-i="token">Your upload token — shown once</span
+            ><input id="token" type="text" readonly autocomplete="off" /><button
+              id="copy-token"
+              type="button"
+              data-i="copy"
+            >
+              Copy token
+            </button></label
+          >
+        </div>
+      </section>
+      <section id="transparency">
+        <p class="eyebrow" data-i="open">OPEN SOURCE. EXPLICIT CHOICES.</p>
+        <h2 data-i="transparentTitle">
+          Know exactly what leaves your computer.
+        </h2>
+        <div class="cards">
+          <article>
+            <h3 data-i="sent">What is sent</h3>
+            <p data-i="sentText">
+              Effect IDs, area groups, counters, combat exposure, retained
+              segment data, export time and persistent collection/character
+              identifiers. Name and realm only in named mode. No account folder
+              names, local paths, chat, inventory or entire SavedVariables file.
+            </p>
+          </article>
+          <article>
+            <h3 data-i="anonymous">Without names ≠ untraceable</h3>
+            <p data-i="anonymousText">
+              Persistent identifiers make these data pseudonymous. IP addresses
+              are processed for network delivery and abuse limits. Named
+              contributions can reveal a character's identity. Removing a name
+              cannot erase copies someone already downloaded.
+            </p>
+          </article>
+          <article>
+            <h3 data-i="trust">How data are checked</h3>
+            <p data-i="trustText">
+              Lua is parsed as data, never executed. The server checks sizes,
+              known effects, counters, ownership and duplicate snapshots. Public
+              statistics include accepted community submissions, not
+              independently verified gameplay. Suspicious data are withheld.
+            </p>
+          </article>
+        </div>
+        <details>
+          <summary data-i="storage">Storage, deletion and limitations</summary>
+          <p data-i="storageText">
+            We retain the latest cumulative totals and up to 301 supplied
+            history segments per collection. The public API does not expose
+            character UUIDs, device tokens or detailed timestamps. A valid
+            device token can hide stored names or delete its contributions and
+            revoke itself. Contact the operator for device transfer. History
+            gaps remain possible. Authentication tokens are stored hashed on the
+            server. The app prefers the system keychain and does not silently
+            fall back to a plaintext token file.
+          </p>
+        </details>
+        <div class="actions">
+          <a
+            class="button"
+            href="https://github.com/Gabbajoe/GabbaProcPlatform"
+            data-i="source"
+            >Read website & app source ↗</a
+          ><a
+            class="button"
+            href="https://github.com/Gabbajoe/GabbaProcPlatform/issues"
+            data-i="feedback"
+            >Questions & issues ↗</a
+          >
+        </div>
+      </section>
+      <section>
+        <h2 data-i="named">Contributors who chose to share their name</h2>
+        <div id="names" class="name-list"></div>
+      </section>
+    </main>
+    <footer>
+      <span>GabbaProc · Community data for Classic Era / Hardcore</span
+      ><a href="https://github.com/Gabbajoe/GabbaProcPlatform/blob/main/LICENSE"
+        >MIT · Source</a
+      ><a href="https://nilskeller.de/seiten/Impressum.html" data-i="legal"
+        >Operator / legal notice</a
+      >
+    </footer>
+  </body>
+</html>
