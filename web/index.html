@@ -254,14 +254,16 @@
         <details>
           <summary data-i="storage">Storage, deletion and limitations</summary>
           <p data-i="storageText">
-            We retain the latest cumulative totals and up to 301 supplied
-            history segments per collection. The public API does not expose
-            character UUIDs, device tokens or detailed timestamps. A valid
-            device token can hide stored names or delete its contributions and
-            revoke itself. Contact the operator for device transfer. History
-            gaps remain possible. Authentication tokens are stored hashed on the
-            server. The app prefers the system keychain and does not silently
-            fall back to a plaintext token file.
+            Private daily backups expire after seven days; deleted contributions
+            may remain in those backups until then. We retain the latest
+            cumulative totals and up to 301 supplied history segments per
+            collection. The public API does not expose character UUIDs, device
+            tokens or detailed timestamps. A valid device token can hide stored
+            names or delete its contributions and revoke itself. Contact the
+            operator for device transfer. History gaps remain possible.
+            Authentication tokens are stored hashed on the server. The app
+            prefers the system keychain and does not silently fall back to a
+            plaintext token file.
           </p>
         </details>
         <div class="actions">

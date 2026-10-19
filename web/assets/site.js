@@ -67,7 +67,7 @@ const de = {
     "Lua wird als Datenformat gelesen, niemals ausgeführt. Der Server prüft Größen, bekannte Effekte, Zähler, Zuordnung und doppelte Exporte. Öffentliche Statistiken enthalten angenommene Community-Beiträge, keine unabhängig bestätigten Spielereignisse. Auffällige Daten werden zurückgehalten.",
   storage: "Speicherung, Löschung und Grenzen",
   storageText:
-    "Gespeichert werden der neueste Gesamtstand und bis zu 301 übermittelte Segmente je Messreihe. Die öffentliche API zeigt keine Charakter-UUIDs, Geräte-Tokens oder detaillierten Zeitstempel. Mit gültigem Gerätezugang lassen sich gespeicherte Namen entfernen oder eigene Beiträge löschen und der Zugang widerrufen. Gerätewechsel: Betreiber kontaktieren. Verlaufslücken sind möglich. Auf dem Server liegen Tokens nur gehasht. Die App bevorzugt den System-Schlüsselspeicher und speichert Tokens nicht heimlich als Klartextdatei.",
+    "Gespeichert werden der neueste Gesamtstand und bis zu 301 übermittelte Segmente je Messreihe. Die öffentliche API zeigt keine Charakter-UUIDs, Geräte-Tokens oder detaillierten Zeitstempel. Mit gültigem Gerätezugang lassen sich gespeicherte Namen entfernen oder eigene Beiträge löschen und der Zugang widerrufen. Gerätewechsel: Betreiber kontaktieren. Private tägliche Sicherungen werden nach sieben Tagen gelöscht; gelöschte Beiträge können bis dahin noch in Sicherungen liegen. Verlaufslücken sind möglich. Auf dem Server liegen Tokens nur gehasht. Die App bevorzugt den System-Schlüsselspeicher und speichert Tokens nicht heimlich als Klartextdatei.",
   source: "Quellcode von Website & App ↗",
   feedback: "Fragen & Fehler melden ↗",
   named: "Beitragende, die ihren Namen freigegeben haben",

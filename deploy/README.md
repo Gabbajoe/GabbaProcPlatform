@@ -13,3 +13,5 @@ docker exec gabbaproc python -m server.admin invite
 Keep the output private and deliver it to one participant. `list`, `approve COLLECTION_ID` and `revoke DEVICE_ID` are additional operator actions; check `python -m server.admin --help`.
 
 For a deployment, build a new image from a tested revision, stop only the `gabbaproc` container, and recreate it with the same private data volume. Take a SQLite-consistent backup first (`sqlite3.Connection.backup`, not a live copy of only the main WAL database file). Do not deploy unrelated sites or regenerate Froxlor configuration by hand. Store and rotate backups outside the webroot. A prior image plus the compatible database backup provides rollback.
+
+Production uses `gabbaproc-backup.timer` and the included `backup.py` for a daily integrity-checked SQLite backup with seven-day retention in `/var/backups/gabbaproc` (root-only). The service needs write access to the source directory for SQLite WAL shared-memory bookkeeping, while the database itself is opened with `mode=ro`.
