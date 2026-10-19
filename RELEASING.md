@@ -10,3 +10,5 @@
 No app package download passes through the community server. Backend deployments are separate, deliberate operator actions; pushing a website commit does not silently change the production database.
 
 The pinned updater supports AppImage and native DEB updates; preserve the matching `linux-x86_64-appimage` and `linux-x86_64-deb` manifest entries. System DEB installation may prompt for administrator authorization. Keep all four OS/architecture entries in `latest.json`; verify each signature against the compiled public key before publishing the draft.
+
+For independent verification, download all assets and run `python tools/verify_release.py /path/to/assets` with `minisign` installed. It requires all four OS/architecture targets, checks GitHub download origins, compares manifest/asset signatures, verifies every update payload with the compiled public key, and writes `SHA256SUMS.txt`.
