@@ -10,7 +10,7 @@ Community proc research for WoW Classic Era / Hardcore. Website, API and lightwe
 
 ## How it works
 
-1. Install GabbaProcTracker. Collect combat data, run `/gpt export`, then `/reload` or log out.
+1. Install GabbaProcTracker. Collect combat data, use `/reload` or log out (automatic export since addon 0.1.1; older versions need `/gpt export` first).
 2. Install the companion for Windows, macOS or Linux. It uses the operating system WebView, without shipping Chromium.
 3. Get a single-use pilot invite from the operator and exchange it on the website for an upload token.
 4. Save the token in the app. Select characters; uploads are anonymous by default. Public character name and realm are an explicit per-character choice.
