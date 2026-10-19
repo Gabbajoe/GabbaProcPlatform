@@ -1,0 +1,29 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    pids_limit: 128
+    environment:
+      FORWARDED_ALLOW_IPS: ${GABBAPROC_PROXY_IP:?Set the trusted proxy address}
+    ports:
+      - '127.0.0.1:${GABBAPROC_LOCAL_PORT:?Choose a free local port}:8757'
+    volumes:
+      - ${GABBAPROC_DATA_DIR:?Choose a private data directory}:/data
+    networks: [proc]
+    healthcheck:
+      test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8757/api/health', timeout=3)"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+networks:
+  proc:
+    name: ${GABBAPROC_NETWORK:?Choose a private Docker network}
+    external: true
