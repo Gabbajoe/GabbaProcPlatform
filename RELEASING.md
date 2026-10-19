@@ -8,3 +8,5 @@
 `TAURI_SIGNING_PRIVATE_KEY` must be a repository Actions secret. The matching public key is compiled into the app. Keep an offline private backup: loss of this key breaks seamless updates for installed clients. Never commit it. Rotation needs a carefully staged release. A signed updater artifact is not an Apple-notarized or Authenticode-signed installer.
 
 No app package download passes through the community server. Backend deployments are separate, deliberate operator actions; pushing a website commit does not silently change the production database.
+
+Linux automatic updates require the AppImage. Mark `.deb` downloads as manual-update packages in release notes. Keep all four OS/architecture entries in `latest.json`; verify each signature against the compiled public key before publishing the draft.
