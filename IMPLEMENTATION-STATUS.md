@@ -60,7 +60,7 @@ The local AppImage uses an optimized build with the explicit `local-test` featur
    define operator recovery for blocked jobs and long-running archive limits.
 3. Complete real Discord/GitHub consent tests with the operator. Account/session,
    email and device-pairing code is implemented; email pairing passed via public
-   HTTPS. The new native pairing UI is in local 0.1.3-rc.1, not a published release.
+   HTTPS. The new native pairing UI is in local 0.1.3-rc.2, not a published release.
 4. Test worker interruption, pending-job disaster recovery, large archives,
    disk-full behavior and representative 200-user traffic through HTTP/proxy.
    Add operator retry/monitoring and scheduled backup retention/offsite copies.

@@ -71,8 +71,32 @@ label {
   color: var(--muted);
 }
 :focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 3px;
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+input:focus-visible,
+select:focus-visible {
+  border-color: var(--blue);
+  outline: 1px solid var(--blue);
+  outline-offset: 0;
+}
+#account-login form:not([hidden]),
+#signed-account form {
+  display: grid;
+  gap: 8px;
+  margin-block: 14px;
+}
+#account-login form button,
+#signed-account form button {
+  justify-self: start;
+}
+#provider-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+#pair-code {
+  max-width: 22rem;
 }
 .skip {
   position: absolute;

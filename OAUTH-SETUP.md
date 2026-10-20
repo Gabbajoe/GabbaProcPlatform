@@ -174,7 +174,7 @@ müssen funktionieren. Kein Zugriff auf private Benutzer-Postfächer erforderlic
 
 ## Companion mit dem Konto verbinden
 
-Die direkte Verknüpfung ist im lokalen AppImage 0.1.3-rc.1 enthalten. Für die
+Die direkte Verknüpfung ist im lokalen AppImage 0.1.3-rc.2 enthalten. Für die
 veröffentlichte 0.1.2 auf der Kontoseite einen Token erzeugen oder den bestehenden
 Token ausdrücklich zuordnen.
 

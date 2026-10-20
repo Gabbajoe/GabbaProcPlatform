@@ -8,7 +8,38 @@
   const status = (en, de) => {
     el("account-status").textContent = tr(en, de);
   };
+  const pairingKey = "gabbaproc.pendingPairing";
+  let pairingShown = false;
+  function pendingPairing() {
+    try {
+      const pending = JSON.parse(localStorage.getItem(pairingKey));
+      if (
+        pending &&
+        /^[A-F0-9]{10}$/.test(pending.code) &&
+        pending.expires > Date.now() &&
+        pending.expires <= Date.now() + 600000
+      )
+        return pending;
+      localStorage.removeItem(pairingKey);
+    } catch (_) {
+      /* Manual code entry remains available if storage is blocked. */
+    }
+    return null;
+  }
   const emailLink = new URLSearchParams(location.hash.slice(1));
+  if (emailLink.has("deviceCode")) {
+    const code = (emailLink.get("deviceCode") || "").toUpperCase();
+    if (/^[A-F0-9]{10}$/.test(code)) {
+      try {
+        localStorage.setItem(
+          pairingKey,
+          JSON.stringify({ code, expires: Date.now() + 600000 }),
+        );
+      } catch (_) {}
+      el("pair-code").value = code;
+    }
+    history.replaceState(null, "", location.pathname + location.search);
+  }
   if (emailLink.has("emailChallenge") || emailLink.has("emailCode")) {
     // Remove secrets from the current history entry before any API call.
     history.replaceState(null, "", location.pathname + location.search);
@@ -97,6 +128,12 @@
       el("provider-buttons").append(button);
     }
     if (!account) return;
+    const pending = pendingPairing();
+    if (pending && !pairingShown) {
+      pairingShown = true;
+      el("pair-code").value = pending.code;
+      el("pair-approve").scrollIntoView({ block: "center" });
+    }
     el("account-identities").textContent = account.identities
       .map((i) => i.provider + ": " + i.display)
       .join(" · ");
@@ -185,9 +222,13 @@
   el("pair-approve").onsubmit = (event) => {
     event.preventDefault();
     action(event.submitter, async () => {
-      await request("/device-link/approve", "POST", {
-        userCode: el("pair-code").value.trim().toUpperCase(),
-      });
+      const approvedCode = el("pair-code").value.trim().toUpperCase();
+      await request("/device-link/approve", "POST", { userCode: approvedCode });
+      if (pendingPairing()?.code === approvedCode) {
+        try {
+          localStorage.removeItem(pairingKey);
+        } catch (_) {}
+      }
       el("pair-code").value = "";
       await refresh();
       status(

@@ -393,7 +393,11 @@ async fn start_pairing(state: State<'_, AppState>, pairing: State<'_, Pairing>) 
         }
         *pairing.0.lock().unwrap() = Some((code, token));
         // Construct the browser destination ourselves; never execute a server-supplied URL.
-        let url = format!("{}/account.html", api_base().trim_end_matches("/api"));
+        let url = format!(
+            "{}/account.html#deviceCode={}",
+            api_base().trim_end_matches("/api"),
+            user_code
+        );
         #[cfg(target_os = "linux")]
         let opened = std::process::Command::new("xdg-open")
             .arg(&url)

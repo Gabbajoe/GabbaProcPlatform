@@ -8,7 +8,7 @@ build_version=0.1.3-dev.1
 build_features=local-test
 case "${1:-}" in
   "") ;;
-  --production-candidate) build_version=0.1.3-rc.1; build_features= ;;
+  --production-candidate) build_version=0.1.3-rc.2; build_features= ;;
   *) echo "Usage: $0 [--production-candidate]" >&2; exit 2 ;;
 esac
 cat > "$output/config.json" <<'JSON'
@@ -16,7 +16,7 @@ cat > "$output/config.json" <<'JSON'
 JSON
 if [[ -z "$build_features" ]]; then
   cat > "$output/config.json" <<'JSON'
-{"version":"0.1.3-rc.1","bundle":{"createUpdaterArtifacts":false},"app":{"windows":[{"title":"GabbaProc Companion — Release candidate","width":920,"height":780,"minWidth":650,"minHeight":560}]}}
+{"version":"0.1.3-rc.2","bundle":{"createUpdaterArtifacts":false},"app":{"windows":[{"title":"GabbaProc Companion — Release candidate","width":920,"height":780,"minWidth":650,"minHeight":560}]}}
 JSON
 fi
 podman build -t localhost/gabbaproc-appimage-build -f "$repo/deploy/companion-build.Containerfile" "$repo/deploy"

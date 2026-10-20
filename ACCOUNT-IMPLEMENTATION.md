@@ -71,7 +71,7 @@ Operator registration guide: [OAUTH-SETUP.md](OAUTH-SETUP.md).
 
 Legal pages are live in DE/EN: `/imprint.html` and `/privacy.html`. See
 [operational verification](deploy/LEGAL-PAGES.md). Account and companion
-pairing are implemented. Companion 0.1.3-rc.1 is a local production-endpoint
+pairing are implemented. Companion 0.1.3-rc.2 is a local production-endpoint
 AppImage, not a published updater release.
 
 
