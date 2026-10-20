@@ -1,8 +1,8 @@
 # PostgreSQL staging and migration
 
-This is the development deployment for the durable-data branch. Production is
-still on SQLite. Do not replace production until account migration, archive
-batching, client receipts, restore tests and peak-load validation are complete.
+The PostgreSQL deployment is live as of 2026-10-20. See PRODUCTION.md for the
+cutover evidence and outstanding validation. Account login is still unavailable;
+existing device tokens and operator invitations remain supported.
 
 Use `compose.postgres.yaml`. Every persistent mount is a host bind. PostgreSQL
 17's data directory is explicitly mounted at `/var/lib/postgresql/data`; there
@@ -36,7 +36,10 @@ creation disabled. Retain the old SQLite deployment template for rollback.
 For migration, first pause writers and create a SQLite-consistent backup. Mount
 that backup read-only in a one-off migration container and run
 `python -m server.migrate --sqlite /backup/procs.sqlite3`. The destination must be
-empty. Existing devices, token hashes, names, counters and available history are
+empty. Before mounting the backup, use `PRAGMA journal_mode=DELETE` on the
+backup copy and close it; a WAL-mode backup can otherwise try to create auxiliary
+files beside the read-only mount. Never change the live source for this step.
+Existing devices, token hashes, names, counters and available history are
 copied in one destination transaction. The source is never modified. Independently
 compare totals and ownership, then test uploads before switching the proxy.
 

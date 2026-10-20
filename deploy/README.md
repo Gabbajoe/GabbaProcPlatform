@@ -1,6 +1,10 @@
-# Self-hosting
+# Deployment
 
-The production host runs the Python 3.12 image defined here, with a dedicated UID, read-only root filesystem, bounded memory/PIDs and a private SQLite volume. Port 8757 is bound to loopback only. Set `FORWARDED_ALLOW_IPS` to the dedicated Docker network gateway used by the local proxy. Never use `*`.
+Production now uses PostgreSQL and a separate worker. See [production operations](PRODUCTION.md) and [PostgreSQL setup](POSTGRES.md).
+
+## Previous SQLite deployment (rollback reference)
+
+The previous production host configuration runs the Python 3.12 image defined here, with a dedicated UID, read-only root filesystem, bounded memory/PIDs and a private SQLite volume. Port 8757 is bound to loopback only. Set `FORWARDED_ALLOW_IPS` to the dedicated Docker network gateway used by the local proxy. Never use `*`.
 
 Apache/Froxlor serves `web/` from the new domain docroot, proxies `/api/` to `http://127.0.0.1:8757/api/`, and manages Let's Encrypt. Disable PHP and directory listings for this domain. Set `LimitRequestBody 2097152`, `RequestReadTimeout header=10-20,MinRate=500 body=10,MinRate=500`, and the security headers from `server/app.py` for static pages too.
 

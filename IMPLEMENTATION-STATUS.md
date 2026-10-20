@@ -1,7 +1,16 @@
 # Development checkpoint — 2026-10-20
 
-Branch: `feature/durable-data-platform`. This is unfinished development, not a
-production release. The live platform still uses the existing SQLite deployment.
+Production cutover completed on 2026-10-20. The live website and API now use
+PostgreSQL with a separate upload worker and host bind mounts. Desktop 0.1.2 is
+being built as a release draft; account login remains unavailable.
+
+Live validation: all five portal pages, DE/EN switching and the CurseForge link;
+HTTPS invite enrollment, two archive packets with retained fights, idempotent
+receipts, legacy imports and quarantine. Temporary test data was deleted.
+The existing device/token and invitations were migrated. PostgreSQL dump/restore
+was verified in an isolated database and the daily database/spool backup timer
+was switched over. The stopped SQLite container and pre-cutover backups remain
+available. See [production operations](deploy/PRODUCTION.md).
 
 ## Implemented and locally checked
 
@@ -40,10 +49,9 @@ Validation: 25 PostgreSQL tests pass, including a >8 MiB Lua SavedVariables file
 processed by the real Rust parser into 19 packets and 1,702 stored fights across
 two collections. Thirteen core Rust tests and a native HTTP transport test pass.
 The local AppImage uses an optimized build with the explicit `local-test` feature. See
-[local companion test instructions](LOCAL-COMPANION-TEST.md). No release pipeline
-was started for this work and the production deployment remains unchanged.
+[local companion test instructions](LOCAL-COMPANION-TEST.md). The 0.1.2 release workflow was explicitly started after local validation.
 
-## Required before production cutover
+## Remaining validation and follow-up
 
 1. Validate the new bounded archive batches and late backfill under representative
    concurrent load and interruptions. The published client still uses schema 1.
@@ -54,8 +62,8 @@ was started for this work and the production deployment remains unchanged.
 4. Test worker interruption, pending-job disaster recovery, large archives,
    disk-full behavior and representative 200-user traffic through HTTP/proxy.
    Add operator retry/monitoring and scheduled backup retention/offsite copies.
-5. Review the actual host resources, render/test the deployment configuration,
-   test migration/rollback, then schedule the production cutover.
+5. Exercise full disaster recovery with pending jobs and verify rollback procedures
+   after new production writes; the empty-spool dump/restore check is complete.
 
 The addon branch adds opt-in zone snapshots and a full local combat archive,
 including collections retained through reset. The UI and legacy export retain
