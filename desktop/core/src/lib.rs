@@ -552,12 +552,7 @@ pub fn install_desktop_entry(
     fs::create_dir_all(&icons)?;
     let icon = icons.join("info.kellerkind.gabbaproc.png");
     fs::write(&icon, icon_bytes)?;
-    let icon_path = icon
-        .to_string_lossy()
-        .replace('\\', "\\\\")
-        .replace('\n', "\\n")
-        .replace('\r', "\\r");
-    let entry = format!("[Desktop Entry]\nType=Application\nName=GabbaProc Companion\nComment=Upload your WoW proc exports\nExec={exec}\nIcon={icon_path}\nTerminal=false\nCategories=Utility;\nStartupWMClass=gabbaproc-companion\n");
+    let entry = format!("[Desktop Entry]\nType=Application\nName=GabbaProc Companion\nComment=Upload your WoW proc exports\nExec={exec}\nIcon=info.kellerkind.gabbaproc\nTerminal=false\nCategories=Utility;\nStartupWMClass=gabbaproc-companion\n");
     let temporary = applications.join(format!(".gabbaproc-{}.desktop.tmp", std::process::id()));
     fs::write(&temporary, entry)?;
     fs::rename(temporary, applications.join("gabbaproc-companion.desktop"))?;
@@ -696,6 +691,7 @@ mod tests {
         assert!(text.contains("Exec=\"/new folder/GabbaProc.AppImage\""));
         assert!(!text.contains("/first/"));
         assert!(text.contains("StartupWMClass=gabbaproc-companion"));
+        assert!(text.contains("Icon=info.kellerkind.gabbaproc\n"));
         assert_eq!(
             fs::read(temp.join("icons/hicolor/128x128/apps/info.kellerkind.gabbaproc.png"))
                 .unwrap(),
