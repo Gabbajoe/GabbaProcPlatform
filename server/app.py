@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
-from .models import Upload, CATALOG
+from .models import Upload, CATALOG, CATALOG_EN
 from .storage import init, connect, digest, lock
 from starlette.concurrency import run_in_threadpool
 from . import upload_queue
@@ -510,6 +510,10 @@ def stats():
             {
                 "spellId": r["spell"],
                 "name": CATALOG[str(r["spell"])],
+                "names": {
+                    "de": CATALOG[str(r["spell"])],
+                    "en": CATALOG_EN[str(r["spell"])],
+                },
                 "group": r["area"],
                 "procs": int(r["procs"]),
                 "combatProcs": int(r["combat"]),

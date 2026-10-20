@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 CATALOG = json.loads((Path(__file__).parent / "catalog.json").read_text())
+CATALOG_EN = json.loads((Path(__file__).parent / "catalog-en.json").read_text())
 IDS = {int(k) for k in CATALOG}
 Group = Literal["world", "party", "raid"]
 

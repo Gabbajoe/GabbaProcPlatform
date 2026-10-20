@@ -479,3 +479,15 @@ def test_legacy_client_can_replay_after_archive_upgrade(api, sample):
     assert api.post("/api/imports", json=sample).status_code == 200
     with connect() as db:
         assert db.execute("SELECT COUNT(*) FROM segments").fetchone()[0] == 1
+
+
+def test_effect_names_available_in_both_languages(api, sample):
+    from server.models import CATALOG, CATALOG_EN
+
+    assert set(CATALOG) == set(CATALOG_EN)
+    assert CATALOG_EN["17941"] == "Shadow Trance (Nightfall)"
+    assert CATALOG_EN["17800"] == "Shadow Vulnerability (Improved Shadow Bolt)"
+    assert api.post("/api/imports", json=sample).status_code == 200
+    row = api.get("/api/stats").json()["rows"][0]
+    assert row["names"] == {"de": "Kreuzfahrer", "en": "Crusader"}
+    assert row["name"] == "Kreuzfahrer"  # old clients keep the existing field

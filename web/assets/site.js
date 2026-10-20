@@ -1,14 +1,19 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
-let language =
-  localStorage.getItem("language") === "de" ||
-  (!localStorage.getItem("language") && navigator.language.startsWith("de"))
+let savedLanguage;
+try {
+  savedLanguage = localStorage.getItem("language");
+} catch (_) {}
+let language = ["de", "en"].includes(savedLanguage)
+  ? savedLanguage
+  : navigator.language.startsWith("de")
     ? "de"
     : "en";
 let dataset = null,
   visible = [],
   loadError = false;
 const t = (en, de) => (language === "de" ? de : en);
+const effectName = (row) => row.names?.[language] || row.name;
 const number = (n, digits = 0) =>
   new Intl.NumberFormat(language, { maximumFractionDigits: digits }).format(n);
 const areaName = (a) =>
@@ -28,7 +33,7 @@ function translate() {
   document.documentElement.lang = language;
   for (const e of document.querySelectorAll("[data-en][data-de]"))
     e.textContent = e.dataset[language];
-  $("language").textContent = language === "de" ? "EN" : "DE";
+  $("language").value = language;
   document.querySelector(".skip").textContent = t(
     "Skip to content",
     "Zum Inhalt",
@@ -65,7 +70,7 @@ function render() {
     const minimum = Math.max(0, Number($("minimum").value) || 0);
     visible = rows.filter(
       (r) =>
-        (r.name.toLocaleLowerCase().includes(q) ||
+        (effectName(r).toLocaleLowerCase().includes(q) ||
           String(r.spellId).includes(q)) &&
         (area === "all" || r.group === area) &&
         r.seconds / 60 >= minimum,
@@ -73,7 +78,7 @@ function render() {
     const sort = $("sort").value;
     visible.sort((a, b) =>
       sort === "name"
-        ? a.name.localeCompare(b.name, language) ||
+        ? effectName(a).localeCompare(effectName(b), language) ||
           a.group.localeCompare(b.group)
         : (b[sort] ?? -1) - (a[sort] ?? -1) || a.spellId - b.spellId,
     );
@@ -81,7 +86,7 @@ function render() {
     for (const r of visible) {
       const tr = element("tr"),
         title = element("td"),
-        link = element("a", r.name);
+        link = element("a", effectName(r));
       link.href = "/compare.html?effect=" + encodeURIComponent(r.spellId);
       title.append(link, element("small", "#" + r.spellId));
       tr.append(title);
@@ -138,7 +143,9 @@ function renderComparison() {
   const select = $("effect-select"),
     selected = select.value === "—" ? params.get("effect") : select.value;
   const effects = [
-    ...new Map(dataset.rows.map((r) => [String(r.spellId), r.name])).entries(),
+    ...new Map(
+      dataset.rows.map((r) => [String(r.spellId), effectName(r)]),
+    ).entries(),
   ].sort((a, b) => a[1].localeCompare(b[1], language));
   select.replaceChildren();
   for (const [id, name] of effects) {
@@ -226,9 +233,11 @@ async function refresh() {
     render();
   }
 }
-$("language").onclick = () => {
-  language = language === "de" ? "en" : "de";
-  localStorage.setItem("language", language);
+$("language").onchange = () => {
+  language = $("language").value;
+  try {
+    localStorage.setItem("language", language);
+  } catch (_) {}
   translate();
 };
 for (const id of ["search", "area", "minimum", "sort"])
@@ -275,7 +284,7 @@ if ($("csv"))
       ],
       ...visible.map((r) => [
         r.spellId,
-        r.name,
+        effectName(r),
         r.group,
         r.procs,
         r.combatProcs,
