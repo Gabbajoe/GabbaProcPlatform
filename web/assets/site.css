@@ -118,10 +118,10 @@ label {
   margin-left: auto;
   display: inline-flex;
   flex-shrink: 0;
-  border: 1px solid #71522d;
+  border: 1px solid var(--edge);
   border-radius: 999px;
   overflow: hidden;
-  background: #151c27;
+  background: var(--panel);
 }
 #language button {
   border: 0;
@@ -130,25 +130,25 @@ label {
   min-width: 33px;
   padding: 8px 9px;
   background: transparent;
-  color: #c2af91;
+  color: var(--muted);
   font-size: 10px;
   line-height: 14px;
   font-weight: 750;
 }
 #language button[aria-pressed="true"] {
-  background: #c7933f;
-  color: #17120b;
+  background: var(--blue);
+  color: #101b2b;
 }
 #language button:hover {
-  background: #493b29;
-  color: #fff0d6;
+  background: #243d59;
+  color: var(--text);
 }
 #language button[aria-pressed="true"]:hover {
-  background: #d5a14d;
-  color: #17120b;
+  background: #91c7ff;
+  color: #101b2b;
 }
 #language button:focus-visible {
-  outline: 2px solid #f7dc9e;
+  outline: 2px solid #c4e2ff;
   outline-offset: -3px;
 }
 
