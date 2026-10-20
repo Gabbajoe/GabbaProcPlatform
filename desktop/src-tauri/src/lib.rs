@@ -39,6 +39,7 @@ struct Inner {
     busy: bool,
     last_auto_attempt: Option<Instant>,
     last_queue_attempt: Option<Instant>,
+    manual_drain: bool,
     status: String,
     files: BTreeMap<String, PathBuf>,
     config_file: PathBuf,
@@ -183,6 +184,9 @@ fn add_root(path: String, state: State<AppState>) -> Result<()> {
 fn set_auto(enabled: bool, state: State<AppState>) -> Result<()> {
     let mut s = state.0.lock().unwrap();
     s.config.auto_upload = enabled;
+    if !enabled {
+        s.manual_drain = false;
+    }
     s.last_auto_attempt = Some(Instant::now());
     save(&s)
 }
@@ -331,7 +335,7 @@ fn outbox_path(s: &Inner, token: &str, id: &str) -> PathBuf {
 fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
     let (token, jobs, bandwidth) = {
         let mut s = state.0.lock().unwrap();
-        if s.busy || (automatic && !s.config.auto_upload) {
+        if s.busy || (automatic && !s.config.auto_upload && !s.manual_drain) {
             return Ok(json!({"status":"idle"}));
         }
         if automatic
@@ -342,9 +346,10 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
         }
         s.last_queue_attempt = Some(Instant::now());
         let fresh = !automatic
-            || s.last_auto_attempt.is_none_or(|last| {
-                last.elapsed() >= Duration::from_secs(s.config.upload_interval_minutes * 60)
-            });
+            || (s.config.auto_upload
+                && s.last_auto_attempt.is_none_or(|last| {
+                    last.elapsed() >= Duration::from_secs(s.config.upload_interval_minutes * 60)
+                }));
         if fresh {
             s.last_auto_attempt = Some(Instant::now());
         }
@@ -366,6 +371,9 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
             .filter(|(_, _, _, _, queue_path)| fresh || queue_path.exists())
             .collect();
         s.busy = true;
+        if !automatic {
+            s.manual_drain = true;
+        }
         (token, jobs, s.config.upload_bandwidth_kib)
     };
     let result: Result<Value> = (|| {
@@ -515,6 +523,21 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
     })();
     let mut s = state.0.lock().unwrap();
     s.busy = false;
+    // Finish only existing selected queues; this does not enable scheduled
+    // discovery or automatically upload later exports after a manual request.
+    if s.manual_drain {
+        s.manual_drain = s
+            .config
+            .choices
+            .iter()
+            .filter(|(_, choice)| choice.enabled)
+            .any(|(id, _)| {
+                gabbaproc_core::outbox::Outbox::load(&outbox_path(&s, &token, id))
+                    .ok()
+                    .flatten()
+                    .is_some_and(|queue| queue.blocked.is_none())
+            });
+    }
     s.status = match &result {
         Ok(v) => v.to_string(),
         Err(e) => e.clone(),
@@ -670,6 +693,7 @@ pub fn run() {
                 busy: false,
                 last_auto_attempt: Some(Instant::now()),
                 last_queue_attempt: None,
+                manual_drain: false,
                 status: String::new(),
                 files: BTreeMap::new(),
                 config_file: file,
@@ -814,6 +838,7 @@ mod transport_tests {
             busy: false,
             last_auto_attempt: None,
             last_queue_attempt: None,
+            manual_drain: false,
             status: String::new(),
             files: BTreeMap::new(),
             config_file: dir.join("preferences.json"),
@@ -845,10 +870,15 @@ mod transport_tests {
             .unwrap()
             .job_id
             .is_some());
-        let third = sync_inner(&state, false).unwrap();
+        assert!(!state.0.lock().unwrap().config.auto_upload);
+        assert!(state.0.lock().unwrap().manual_drain);
+        state.0.lock().unwrap().last_queue_attempt = None;
+        let third = sync_inner(&state, true).unwrap();
         assert_eq!(third["uploaded"], 1);
         assert_eq!(state.0.lock().unwrap().config.acks[id], "fingerprint");
         assert!(!queue_path.exists());
+        assert!(!state.0.lock().unwrap().manual_drain);
+        assert_eq!(sync_inner(&state, true).unwrap()["status"], "idle");
         server.join().unwrap();
         std::env::remove_var("GABBAPROC_TEST_API");
         fs::remove_dir_all(dir).unwrap();

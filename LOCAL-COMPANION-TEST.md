@@ -36,7 +36,11 @@ The cursor advances only for a matching `processed` receipt. Restart, missing
 source files, network failures and rate limits leave the outbox intact. Retries
 respect numeric Retry-After and use capped exponential backoff plus jitter.
 Pending queues are checked separately from the configured new-export interval.
-Disabling automatic uploads stops automatic queue processing too. Failed,
+A manual upload continues polling and sending its existing selected queue even
+when scheduled uploads are off. It stops after confirmation and does not collect
+new exports automatically. Explicitly switching automatic uploads off pauses
+background processing; closing the application also pauses it. After a restart,
+click Upload again to resume a manual queue. Failed,
 rejected or cancelled jobs remain visible and retained for operator resolution.
 
 The optional bandwidth setting offers unlimited (default), 64, 128, 256, 512 or
