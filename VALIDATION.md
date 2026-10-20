@@ -22,3 +22,15 @@ Still requiring real-device acceptance: Windows/macOS first launch, OS-specific 
 - Fedora 44 `dnf --assumeno install` resolved the package plus WebKitGTK/JavaScriptCore dependencies. No system packages were installed. Native RPM GUI launch and a future RPM-to-RPM updater installation remain untested.
 - All six updater payloads independently verified against the compiled minisign public key. Added `linux-x86_64-rpm` while retaining the AppImage default and other format targets. Refreshed checksums.
 - Corrected an existing Windows manifest signature left stale by run 39338059130 failing during a concurrent manifest replacement. Release matrix uploads now run serially to prevent this race.
+
+## Companion 0.1.1 (2026-10-20)
+
+Compiled source: `d6b8c8ded78b5be65d58638d56b4ffd6111a7bb5`.
+
+- API validation and ten Rust core tests passed, including source labels, interval bounds, desktop command escaping, launcher path refresh, and versioned AppImage rename/collision handling. Native Linux compilation passed CI.
+- Browser tests with a simulated Tauri bridge covered installation grouping, informative invalid-export rows, inert filename markup, all twelve interval choices, language/quit commands, and update ordering: failed installation does not restart; successful installation passes the new version to the restart command.
+- Real Linux AppImage registered with KDE's tray host. Open and Quit menu actions worked. The generated desktop entry passed `desktop-file-validate` and matched the observed Wayland app ID `gabbaproc-companion`.
+- The desktop launcher points at the current AppImage path. Final titlebar appearance could not be visually verified because the session was locked; no unlock was attempted.
+- Fedora 44 dependency resolution for the new RPM succeeded with `dnf --assumeno`; no system packages were installed.
+- All six 0.1.1 updater payloads passed independent minisign verification against the compiled public key. The manifest contains all four OS/architecture targets and all three Linux package formats; manifest signatures match their sidecar files. Release checksums were generated from the downloaded artifacts.
+- Complete version-to-version update/relaunch, native RPM installation, and Windows/macOS runtime acceptance remain outstanding. The 0.1.0 updater retains its existing filename; versioned AppImage renaming applies to updates initiated by 0.1.1 or later.
