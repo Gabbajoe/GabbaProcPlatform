@@ -6,7 +6,7 @@ allein aktiviert noch keinen Login. Bisher funktionieren Einladungs-/Geräte-Tok
 
 ## Reihenfolge und Aufgabenteilung
 
-1. Eigene Impressums- und Datenschutzseite veröffentlichen, Mailversand prüfen.
+1. **Erledigt am 20.10.2026:** Eigene Impressums- und Datenschutzseite sind live (DE/EN); SMTP, lokale Zustellung und Weiterleitung wurden geprüft.
 2. Discord und GitHub registrieren und jeweils vollständig testen.
 3. Google hinzufügen, öffentliche Freigabe/Branding prüfen.
 4. Microsoft hinzufügen. Apple separat nach Klärung der Developer-Mitgliedschaft.
@@ -29,8 +29,8 @@ keine Anbieter-Secrets in der herunterladbaren Companion-App.
 | Betreiber | Nils Keller, privates Projekt |
 | Homepage | `https://gabbaproc.kellerkind.info/` |
 | Kontakt | `gabbaproc@kellerkind.info` |
-| Datenschutz (geplant) | `https://gabbaproc.kellerkind.info/privacy.html` |
-| Impressum (geplant) | `https://gabbaproc.kellerkind.info/imprint.html` |
+| Datenschutz | `https://gabbaproc.kellerkind.info/privacy.html` |
+| Impressum | `https://gabbaproc.kellerkind.info/imprint.html` |
 | Beschreibung | Community proc statistics for World of Warcraft Classic Era and Hardcore. |
 
 Rechtstext-URLs erst zur Prüfung einreichen, wenn die Seiten tatsächlich erreichbar

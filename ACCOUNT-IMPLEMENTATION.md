@@ -58,10 +58,15 @@ invitation flow until the new flow is verified end to end.
 Created the real `gabbaproc@kellerkind.info` mailbox through Froxlor's EmailAccounts
 API; existing forwarding to `mail@nilskeller.de` was preserved. Initialized INBOX
 and verified authenticated SMTP on `mail.nilskeller.de:587` with STARTTLS and
-certificate validation. No test message was sent; end-to-end deliverability and
-SPF/DKIM/DMARC still require verification. Froxlor's effective quota is currently
+certificate validation. A subsequent technical message was delivered to the project mailbox and its
+forwarding destination. DKIM signature and public key were checked; SPF and DMARC
+records are present. External Gmail/Outlook delivery remains untested. Froxlor's effective quota is currently
 unlimited (requested 256 MiB is not enforced by the existing mail configuration).
 Password is in a root-private host configuration file, not this repository.
 The API container does not yet mount it. Email sign-in is not implemented/enabled.
 
 Operator registration guide: [OAUTH-SETUP.md](OAUTH-SETUP.md).
+
+Legal pages are live in DE/EN: `/imprint.html` and `/privacy.html`. See
+[operational verification](deploy/LEGAL-PAGES.md). Account and companion
+pairing implementation remains pending.

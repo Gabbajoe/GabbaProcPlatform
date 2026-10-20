@@ -540,6 +540,6 @@ def index():
 
 @app.get("/{page}.html")
 def portal_page(page: str):
-    if page not in {"compare", "quality", "downloads", "account"}:
+    if page not in {"compare", "quality", "downloads", "account", "imprint", "privacy"}:
         raise HTTPException(404, "Page not found")
     return FileResponse(ROOT / (page + ".html"))
