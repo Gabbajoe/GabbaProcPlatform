@@ -105,10 +105,19 @@
       >
         <section>
           <h2 data-t="connect">Account</h2>
+          <p data-t="pairHelp">
+            Sign in in your browser and approve the device code shown here.
+            Existing upload access is preserved.
+          </p>
+          <button id="pairStart" data-t="pairStart">Connect account</button>
+          <button id="pairCancel" data-t="pairCancel" hidden>
+            Cancel connection
+          </button>
+          <p id="pairStatus" role="status" aria-live="polite"></p>
           <p data-t="tokenHelp">
-            Get an upload token from gabbaproc.kellerkind.info using an operator
-            invite. Paste it here. It is stored in your system keyring, or only
-            for this session when unavailable.
+            Alternatively, paste an existing upload token or create one on the
+            website. It is stored in your system keyring, or only for this
+            session when unavailable.
           </p>
           <label
             ><span data-t="token">Upload token</span

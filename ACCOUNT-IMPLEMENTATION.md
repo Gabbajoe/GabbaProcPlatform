@@ -1,6 +1,6 @@
 # Accounts, companion pairing and legal pages
 
-Status: implementation in progress, 2026-10-20. Existing invitation tokens remain valid.
+Status: Discord, GitHub and email accounts enabled, 2026-10-21. Existing invitation tokens remain valid.
 
 ## Account and device flow
 
@@ -63,10 +63,29 @@ forwarding destination. DKIM signature and public key were checked; SPF and DMAR
 records are present. External Gmail/Outlook delivery remains untested. Froxlor's effective quota is currently
 unlimited (requested 256 MiB is not enforced by the existing mail configuration).
 Password is in a root-private host configuration file, not this repository.
-The API container does not yet mount it. Email sign-in is not implemented/enabled.
+The API now mounts the password read-only. Browser-bound email codes and multipart
+HTML/plaintext messages are implemented. The sign-in button uses a URL fragment,
+cleared before API calls, and requires explicit code confirmation.
 
 Operator registration guide: [OAUTH-SETUP.md](OAUTH-SETUP.md).
 
 Legal pages are live in DE/EN: `/imprint.html` and `/privacy.html`. See
 [operational verification](deploy/LEGAL-PAGES.md). Account and companion
-pairing implementation remains pending.
+pairing are implemented. Companion 0.1.3-rc.1 is a local production-endpoint
+AppImage, not a published updater release.
+
+
+## Verification — 2026-10-21
+
+SQLite suite: 35 passed, 4 skipped. PostgreSQL suite: 38 passed, 1 skipped. Native companion transport test and AppImage
+build passed. Browser checks cover DE/EN account UI, email link prefill/removal,
+explicit confirmation, device pairing and narrow layouts. Own-mailbox SMTP/DKIM,
+code verification, session creation, existing-device pairing and test-account
+removal passed on staging and through public HTTPS. Real Discord/GitHub consent
+and callback still require an operator login; mocked provider exchange is tested.
+
+Session cookies last 14 days; email/OAuth/device flows last 10 minutes. Provider
+identities are never merged by matching email. Connecting an existing token does
+not change its outbox namespace or character ownership. Account deletion revokes
+associated devices and cancels queued imports. Backups retain their documented
+limitations; no automatic deletion from existing backups is claimed.

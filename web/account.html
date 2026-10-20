@@ -11,6 +11,7 @@
     <link rel="icon" href="/assets/logo.png" />
     <link rel="stylesheet" href="/assets/site.css" />
     <script src="/assets/site.js" defer></script>
+    <script src="/assets/account.js" defer></script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
@@ -89,19 +90,206 @@
             Manage access to your contributions.
           </p>
         </div>
-        <section class="panel account-panel">
-          <h2>
-            <span data-en="Account sign-in" data-de="Kontoanmeldung"
-              >Account sign-in</span
-            >
+        <section class="panel account-panel" id="account-login">
+          <h2
+            data-de="Anmelden oder Konto anlegen"
+            data-en="Sign in or create an account"
+          >
+            Sign in or create an account
           </h2>
           <p
-            data-en="Account sign-in is not available yet. Existing companion device tokens continue to work."
-            data-de="Die Kontoanmeldung ist noch nicht verfügbar. Bestehende Geräte-Tokens der Companion-App funktionieren weiterhin."
+            data-de="Melde dich mit Discord, GitHub oder einem Einmalcode per E-Mail an. Zusätzliche Anmeldemethoden kannst du nach der Anmeldung verknüpfen."
+            data-en="Sign in with Discord, GitHub or an email code. You can link additional sign-in methods after signing in."
           >
-            Account sign-in is not available yet. Existing companion device
-            tokens continue to work.
+            Sign in with Discord, GitHub or an email code. You can link
+            additional sign-in methods after signing in.
           </p>
+          <div id="provider-buttons"></div>
+          <form id="email-login">
+            <label
+              for="login-email"
+              data-de="E-Mail-Adresse"
+              data-en="Email address"
+              >Email address</label
+            ><input
+              id="login-email"
+              type="email"
+              autocomplete="email"
+              required
+              maxlength="254"
+            /><button
+              type="submit"
+              data-de="Anmeldecode senden"
+              data-en="Send sign-in code"
+            >
+              Send sign-in code
+            </button>
+          </form>
+          <form id="email-verify" hidden>
+            <label
+              for="login-code"
+              data-de="Achtstelliger Code (10 Minuten gültig)"
+              data-en="Eight-digit code (valid for 10 minutes)"
+              >Eight-digit code (valid for 10 minutes)</label
+            ><input
+              id="login-code"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              pattern="[0-9]{8}"
+              maxlength="8"
+              required
+            /><button
+              type="submit"
+              data-de="Code bestätigen"
+              data-en="Verify code"
+            >
+              Verify code
+            </button>
+          </form>
+          <p
+            data-de="Durch die Anmeldung legst du beim ersten Mal ein Konto an. Gleiche E-Mail-Adressen bei verschiedenen Anbietern führen nicht automatisch zu einem gemeinsamen Konto."
+            data-en="Your first sign-in creates an account. Matching email addresses at different providers do not automatically merge accounts."
+          >
+            Your first sign-in creates an account. Matching email addresses at
+            different providers do not automatically merge accounts.
+          </p>
+        </section>
+        <p id="account-status" role="status" aria-live="polite"></p>
+        <section id="signed-account" class="panel" hidden>
+          <h2 data-de="Dein Konto" data-en="Your account">Your account</h2>
+          <p id="account-identities"></p>
+          <button id="account-logout" data-de="Abmelden" data-en="Sign out">
+            Sign out
+          </button>
+          <h3 data-de="Companion verbinden" data-en="Connect companion">
+            Connect companion
+          </h3>
+          <p
+            data-de="Starte die Verbindung in der Companion-App und gib deren Gerätecode hier ein. Bestätige nur einen Code, den deine eigene App gerade anzeigt."
+            data-en="Start pairing in the companion and enter its device code here. Approve only a code currently displayed by your own app."
+          >
+            Start pairing in the companion and enter its device code here.
+            Approve only a code currently displayed by your own app.
+          </p>
+          <form id="pair-approve">
+            <label for="pair-code" data-de="Gerätecode" data-en="Device code"
+              >Device code</label
+            ><input
+              id="pair-code"
+              autocomplete="off"
+              maxlength="10"
+              pattern="[A-Fa-f0-9]{10}"
+              required
+            /><button
+              type="submit"
+              data-de="Diese App verbinden"
+              data-en="Connect this app"
+            >
+              Connect this app
+            </button>
+          </form>
+          <h3
+            data-de="Bestehenden Upload-Zugang übernehmen"
+            data-en="Link existing upload access"
+          >
+            Link existing upload access
+          </h3>
+          <p
+            data-de="Wenn du bereits mit der Companion-App hochgeladen hast, verknüpfe deren bisherigen Token. So bleiben deine Charaktere und Beiträge zugeordnet."
+            data-en="If you have already uploaded with the companion, link its existing token to preserve ownership of your characters and contributions."
+          >
+            If you have already uploaded with the companion, link its existing
+            token to preserve ownership of your characters and contributions.
+          </p>
+          <form id="claim-device">
+            <input
+              id="claim-token"
+              type="password"
+              autocomplete="off"
+              minlength="30"
+              maxlength="100"
+              required
+              aria-label="Upload token"
+            /><button
+              type="submit"
+              data-de="Bestehenden Token verknüpfen"
+              data-en="Link existing token"
+            >
+              Link existing token
+            </button>
+          </form>
+          <details>
+            <summary>
+              <span
+                data-de="Neuen Upload-Token für Companion 0.1.2 erstellen"
+                data-en="Create a new upload token for Companion 0.1.2"
+                >Create a new upload token for Companion 0.1.2</span
+              >
+            </summary>
+            <p
+              data-de="Für einen neuen Zugang. Bereits hochgeladene Charaktere bleiben an ihren bisherigen Gerätezugang gebunden."
+              data-en="For new access. Previously uploaded characters remain owned by their existing device access."
+            >
+              For new access. Previously uploaded characters remain owned by
+              their existing device access.
+            </p>
+            <button
+              id="account-new-device"
+              data-de="Neuen Token erstellen"
+              data-en="Create new token"
+            >
+              Create new token</button
+            ><input
+              id="account-device-token"
+              type="password"
+              readonly
+              hidden
+              autocomplete="off"
+              aria-label="New upload token"
+            /><button
+              id="account-copy-token"
+              hidden
+              data-de="Token kopieren"
+              data-en="Copy token"
+            >
+              Copy token
+            </button>
+          </details>
+          <h3 data-de="Verbundene Geräte" data-en="Connected devices">
+            Connected devices
+          </h3>
+          <div id="account-devices"></div>
+          <p
+            data-de="Widerrufen stoppt weitere Uploads, löscht aber keine bisherigen Messdaten."
+            data-en="Revoking stops further uploads but does not delete previous measurements."
+          >
+            Revoking stops further uploads but does not delete previous
+            measurements.
+          </p>
+          <details>
+            <summary>
+              <span
+                data-de="Konto und Beiträge löschen"
+                data-en="Delete account and contributions"
+                >Delete account and contributions</span
+              >
+            </summary>
+            <p
+              data-de="Entfernt dieses Konto und die Beiträge aller verknüpften Geräte. Alle zugehörigen Upload-Zugänge werden widerrufen. Lokale Dateien bleiben erhalten; Hinweise zu Backups stehen im Datenschutz."
+              data-en="Removes this account and contributions from all linked devices, and revokes their upload access. Local files remain; see the privacy notice for backups."
+            >
+              Removes this account and contributions from all linked devices,
+              and revokes their upload access. Local files remain; see the
+              privacy notice for backups.
+            </p>
+            <button
+              id="account-delete"
+              data-de="Konto und Beiträge endgültig löschen"
+              data-en="Permanently delete account and contributions"
+            >
+              Permanently delete account and contributions
+            </button>
+          </details>
         </section>
         <details class="panel">
           <summary>

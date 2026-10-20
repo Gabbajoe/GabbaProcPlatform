@@ -12,7 +12,7 @@ Community proc research for WoW Classic Era / Hardcore. Website, API and lightwe
 
 1. Install GabbaProcTracker. Collect combat data, use `/reload` or log out (automatic export since addon 0.1.1; older versions need `/gpt export` first).
 2. Install the companion for Windows, macOS or Linux.
-3. Get a single-use pilot invite from the operator and exchange it on the website for an upload token.
+3. Sign in on the website with Discord, GitHub or an email code. Create an upload token under Account for companion 0.1.2; existing pilot invitations still work.
 4. Save the token in the app. Select characters; uploads are anonymous by default. Public character name and realm are an explicit per-character choice.
 5. Enable automatic uploads if desired. Choose an upload interval from 5 to 60 minutes (default: 15). Closing the window keeps the app running in the tray; use Open or Quit in its menu, or Quit app in the window. If tray creation fails, closing quits the app. Start-at-login and signed automatic app updates are optional.
 
@@ -42,7 +42,7 @@ The companion saves pending archive packets locally until the server confirms pr
 
 Anonymous uploads omit name, realm, zone, account/folder paths and raw SavedVariables. Public statistics omit UUIDs. Named contributors explicitly share their character name and realm. The app can hide a previously published name, or delete every collection owned by its token and revoke that token. Copies previously downloaded by others cannot be recalled.
 
-This first pilot uses operator-issued invites to limit abuse. Moving an existing character to another token requires operator intervention; UUID knowledge alone cannot claim someone else's records. See [SECURITY.md](SECURITY.md).
+Accounts support explicit linking of additional sign-in methods, device revocation and account deletion. Existing upload tokens can be attached after proving possession, preserving their character ownership. Account provider names and email addresses are never public contributor names. UUID knowledge alone cannot claim someone else's records. See [SECURITY.md](SECURITY.md).
 
 ## Development
 
@@ -67,4 +67,4 @@ Releases are built in GitHub Actions for Windows, Linux, Apple Silicon and Intel
 
 Website und Companion sind deutsch/englisch. Die App sucht deinen WoW-Ordner, liest ausschließlich die Proc-Exporte und lädt nur gewählte Charaktere hoch. Automatischer Upload, Autostart und signierte Updates sind optional. Anonym heißt pseudonym: Die dauerhafte UUID erlaubt zusammenhängende Auswertungen. Charaktername und Realm werden nur auf ausdrücklichen Wunsch veröffentlicht.
 
-Ein Export im Addon plus `/reload` oder Ausloggen schreibt die Datei auf die Festplatte. Die App kann nicht auf noch ungespeicherte Daten im WoW-Prozess zugreifen. Die Sammlung ist zunächst ein einladungsbasierter Pilot. Messwerte sind Community-Beiträge und kein Beweis für unterschiedliche Proc-Chancen.
+Ein Export im Addon plus `/reload` oder Ausloggen schreibt die Datei auf die Festplatte. Die App kann nicht auf noch ungespeicherte Daten im WoW-Prozess zugreifen. Die Anmeldung funktioniert mit Discord, GitHub oder E-Mail-Code. Bestehende Einladungen bleiben gültig. Messwerte sind Community-Beiträge und kein Beweis für unterschiedliche Proc-Chancen.

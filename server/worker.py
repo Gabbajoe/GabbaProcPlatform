@@ -4,6 +4,7 @@ import os
 import signal
 import time
 from .storage import init
+from .accounts import cleanup as cleanup_accounts
 from .upload_queue import initialize, process_one, cleanup
 
 
@@ -26,6 +27,7 @@ def main():
             processed = process_one()
             if time.monotonic() - last_cleanup > 60:
                 cleanup()
+                cleanup_accounts()
                 last_cleanup = time.monotonic()
         except Exception:
             print("Worker unavailable; retrying shortly", flush=True)

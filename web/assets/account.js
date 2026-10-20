@@ -1,0 +1,251 @@
+"use strict";
+(() => {
+  let account = null,
+    challenge = null,
+    available = [];
+  const el = (id) => document.getElementById(id);
+  const tr = (en, de) => (document.documentElement.lang === "de" ? de : en);
+  const status = (en, de) => {
+    el("account-status").textContent = tr(en, de);
+  };
+  const emailLink = new URLSearchParams(location.hash.slice(1));
+  if (emailLink.has("emailChallenge") || emailLink.has("emailCode")) {
+    // Remove secrets from the current history entry before any API call.
+    history.replaceState(null, "", location.pathname + location.search);
+    const linkedChallenge = emailLink.get("emailChallenge") || "";
+    const linkedCode = emailLink.get("emailCode") || "";
+    if (
+      /^[A-Za-z0-9_-]{43}$/.test(linkedChallenge) &&
+      /^[0-9]{8}$/.test(linkedCode)
+    ) {
+      challenge = linkedChallenge;
+      el("email-verify").hidden = false;
+      el("login-code").value = linkedCode;
+      status(
+        "Code filled in. Confirm it below in the browser where you requested it.",
+        "Code eingefügt. Bitte unten in dem Browser bestätigen, in dem du ihn angefordert hast.",
+      );
+    }
+  }
+  async function request(path, method = "GET", body, headers = {}) {
+    const r = await fetch("/api" + path, {
+      method,
+      headers: {
+        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...headers,
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+    if (!r.ok) {
+      const error = new Error(
+        r.status === 429 ? "rate" : r.status === 401 ? "session" : "request",
+      );
+      error.status = r.status;
+      throw error;
+    }
+    return r.json();
+  }
+  async function action(button, fn) {
+    button.disabled = true;
+    try {
+      await fn();
+    } catch (e) {
+      if (e.message === "rate")
+        status(
+          "Too many attempts. Please try again later.",
+          "Zu viele Versuche. Bitte später erneut versuchen.",
+        );
+      else if (e.message === "session")
+        status("Please sign in again.", "Bitte erneut anmelden.");
+      else
+        status(
+          "Could not complete this action. Check your entry and try again.",
+          "Aktion fehlgeschlagen. Bitte Eingabe prüfen und erneut versuchen.",
+        );
+    } finally {
+      button.disabled = false;
+    }
+  }
+  function render() {
+    el("signed-account").hidden = !account;
+    const heading = el("account-login").querySelector("h2");
+    if (account) {
+      heading.textContent = tr(
+        "Link another sign-in method",
+        "Weitere Anmeldemethode verknüpfen",
+      );
+    }
+    el("provider-buttons").replaceChildren();
+    for (const provider of available) {
+      const button = document.createElement("button");
+      const name = provider === "github" ? "GitHub" : "Discord";
+      button.textContent = account
+        ? tr("Link " + name, name + " verknüpfen")
+        : tr("Sign in with " + name, "Mit " + name + " anmelden");
+      button.onclick = () =>
+        action(button, async () => {
+          const r = await request("/auth/" + provider + "/start", "POST", {
+            link: !!account,
+          });
+          location.assign(r.url);
+        });
+      el("provider-buttons").append(button);
+    }
+    if (!account) return;
+    el("account-identities").textContent = account.identities
+      .map((i) => i.provider + ": " + i.display)
+      .join(" · ");
+    el("account-devices").replaceChildren();
+    for (const device of account.devices) {
+      const row = document.createElement("p");
+      const label = document.createElement("span");
+      label.textContent =
+        tr("Device ", "Gerät ") +
+        device.id.slice(0, 8) +
+        " · " +
+        new Date(device.created * 1000).toLocaleDateString() +
+        " ";
+      row.append(label);
+      if (device.revoked) {
+        row.append(document.createTextNode(tr("Revoked", "Widerrufen")));
+      } else {
+        const button = document.createElement("button");
+        button.textContent = tr("Revoke", "Widerrufen");
+        button.onclick = () =>
+          action(button, async () => {
+            await request("/account/devices/" + device.id, "DELETE");
+            await refresh();
+          });
+        row.append(button);
+      }
+      el("account-devices").append(row);
+    }
+  }
+  async function refresh() {
+    try {
+      account = await request("/account");
+    } catch (e) {
+      if (e.status === 401 || e.status === 503) account = null;
+      else throw e;
+    }
+    render();
+  }
+  el("email-login").onsubmit = (event) => {
+    event.preventDefault();
+    action(event.submitter, async () => {
+      const r = await request("/auth/email/request", "POST", {
+        email: el("login-email").value.trim(),
+        link: !!account,
+      });
+      challenge = r.challenge;
+      el("email-verify").hidden = false;
+      el("login-code").value = "";
+      el("login-code").focus();
+      status(
+        "Code sent. Check your inbox and spam folder.",
+        "Code versendet. Bitte Posteingang und Spamordner prüfen.",
+      );
+    });
+  };
+  el("email-verify").onsubmit = (event) => {
+    event.preventDefault();
+    action(event.submitter, async () => {
+      await request("/auth/email/verify", "POST", {
+        challenge,
+        code: el("login-code").value.trim(),
+      });
+      challenge = null;
+      el("login-code").value = "";
+      el("email-verify").hidden = true;
+      await refresh();
+      status("Signed in.", "Angemeldet.");
+    });
+  };
+  el("account-logout").onclick = (event) =>
+    action(event.target, async () => {
+      await request("/auth/logout", "POST");
+      location.assign("/account.html");
+    });
+  el("claim-device").onsubmit = (event) => {
+    event.preventDefault();
+    action(event.submitter, async () => {
+      await request("/account/claim-device", "POST", undefined, {
+        Authorization: "Bearer " + el("claim-token").value.trim(),
+      });
+      el("claim-token").value = "";
+      await refresh();
+      status("Existing device linked.", "Bestehender Gerätezugang verknüpft.");
+    });
+  };
+  el("pair-approve").onsubmit = (event) => {
+    event.preventDefault();
+    action(event.submitter, async () => {
+      await request("/device-link/approve", "POST", {
+        userCode: el("pair-code").value.trim().toUpperCase(),
+      });
+      el("pair-code").value = "";
+      await refresh();
+      status(
+        "Approved. The companion will finish connecting.",
+        "Bestätigt. Die Companion-App schließt die Verbindung ab.",
+      );
+    });
+  };
+  el("account-new-device").onclick = (event) =>
+    action(event.target, async () => {
+      const r = await request("/account/devices", "POST");
+      el("account-device-token").value = r.token;
+      el("account-device-token").hidden = false;
+      el("account-copy-token").hidden = false;
+      await refresh();
+      status(
+        "Copy this token into the companion. It is shown only now.",
+        "Diesen Token in die Companion-App kopieren. Er wird nur jetzt ausgegeben.",
+      );
+    });
+  el("account-copy-token").onclick = (event) =>
+    action(event.target, async () => {
+      await navigator.clipboard.writeText(el("account-device-token").value);
+      status("Token copied.", "Token kopiert.");
+    });
+  el("account-delete").onclick = (event) => {
+    if (
+      !confirm(
+        tr(
+          "Permanently delete this account and all contributions from linked devices?",
+          "Dieses Konto und alle Beiträge verknüpfter Geräte endgültig löschen?",
+        ),
+      )
+    )
+      return;
+    action(event.target, async () => {
+      await request("/account", "DELETE");
+      location.assign("/account.html");
+    });
+  };
+  new MutationObserver(render).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["lang"],
+  });
+  (async () => {
+    const config = await request("/auth/options");
+    available = config.providers;
+    el("email-login").hidden = !config.email;
+    await refresh();
+    if (!available.length && !config.email)
+      status(
+        "Sign-in is currently unavailable. Existing invitations still work.",
+        "Anmeldung derzeit nicht verfügbar. Bestehende Einladungen funktionieren weiterhin.",
+      );
+    if (new URLSearchParams(location.search).get("auth") === "failed")
+      status(
+        "Sign-in failed or was cancelled. Please try again.",
+        "Anmeldung fehlgeschlagen oder abgebrochen. Bitte erneut versuchen.",
+      );
+  })().catch(() =>
+    status(
+      "Account service unavailable. Please try again later.",
+      "Kontodienst nicht erreichbar. Bitte später erneut versuchen.",
+    ),
+  );
+})();

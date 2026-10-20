@@ -1,0 +1,21 @@
+# Add after compose.postgres.yaml and the deployment image override.
+# Secrets are individual read-only host binds, available only to the API.
+services:
+  api:
+    environment:
+      GABBAPROC_ACCOUNTS: "true"
+      GABBAPROC_ORIGIN: https://gabbaproc.kellerkind.info
+      GABBAPROC_DISCORD_CLIENT_ID_FILE: /run/private/discord-client-id
+      GABBAPROC_DISCORD_CLIENT_SECRET_FILE: /run/private/discord-client-secret
+      GABBAPROC_GITHUB_CLIENT_ID_FILE: /run/private/github-client-id
+      GABBAPROC_GITHUB_CLIENT_SECRET_FILE: /run/private/github-client-secret
+      GABBAPROC_SMTP_HOST: mail.nilskeller.de
+      GABBAPROC_SMTP_PASSWORD_FILE: /run/private/smtp-password
+      GABBAPROC_AUTH_KEY_FILE: /run/private/auth-key
+    volumes:
+      - ${GABBAPROC_CONFIG_DIR}/discord-client-id:/run/private/discord-client-id:ro
+      - ${GABBAPROC_CONFIG_DIR}/discord-client-secret:/run/private/discord-client-secret:ro
+      - ${GABBAPROC_CONFIG_DIR}/github-client-id:/run/private/github-client-id:ro
+      - ${GABBAPROC_CONFIG_DIR}/github-client-secret:/run/private/github-client-secret:ro
+      - ${GABBAPROC_CONFIG_DIR}/smtp-password:/run/private/smtp-password:ro
+      - ${GABBAPROC_CONFIG_DIR}/auth-key:/run/private/auth-key:ro

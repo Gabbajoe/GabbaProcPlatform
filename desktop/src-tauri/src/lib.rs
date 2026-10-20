@@ -27,6 +27,7 @@ struct Config {
     upload_interval_minutes: u64,
     upload_bandwidth_kib: u64,
     token_digest: Option<String>,
+    account_linked: bool,
     acks: BTreeMap<String, String>,
 }
 fn default_interval() -> u64 {
@@ -50,6 +51,9 @@ struct Inner {
 #[derive(Clone)]
 struct AppState(Arc<Mutex<Inner>>);
 struct RestartTarget(Mutex<Option<PathBuf>>);
+#[derive(Clone)]
+struct Pairing(Arc<Mutex<Option<(String, Option<String>)>>>);
+
 fn key() -> Result<keyring::Entry> {
     keyring::Entry::new(
         if cfg!(any(debug_assertions, feature = "local-test")) {
@@ -124,7 +128,7 @@ fn response(r: std::result::Result<reqwest::blocking::Response, reqwest::Error>)
 #[tauri::command]
 fn overview(state: State<AppState>, app: tauri::AppHandle) -> Value {
     let s = state.0.lock().unwrap();
-    json!({"version":app.package_info().version.to_string(),"localBuild":cfg!(any(debug_assertions, feature = "local-test")),"autoUpload":s.config.auto_upload,"uploadIntervalMinutes":s.config.upload_interval_minutes,"uploadBandwidthKib":s.config.upload_bandwidth_kib,"hasToken":s.token.is_some(),"persistentToken":s.persistent,"keyringLoading":s.keyring_loading,"busy":s.busy,"status":s.status,"progress":s.progress,"finishingUpload":s.manual_drain})
+    json!({"version":app.package_info().version.to_string(),"localBuild":cfg!(any(debug_assertions, feature = "local-test")),"autoUpload":s.config.auto_upload,"uploadIntervalMinutes":s.config.upload_interval_minutes,"uploadBandwidthKib":s.config.upload_bandwidth_kib,"hasToken":s.token.is_some(),"accountLinked":s.config.account_linked,"persistentToken":s.persistent,"keyringLoading":s.keyring_loading,"busy":s.busy,"status":s.status,"progress":s.progress,"finishingUpload":s.manual_drain})
 }
 #[tauri::command]
 async fn discover(state: State<'_, AppState>) -> Result<Value> {
@@ -339,12 +343,148 @@ fn set_token(token: String, state: State<AppState>) -> Result<bool> {
         .and_then(|k| k.set_password(&token).map_err(|_| "Keyring locked".into()))
         .is_ok();
     s.keyring_loading = false;
+    s.config.account_linked = false;
     s.config.token_digest = Some(format!("{:x}", Sha256::digest(token.as_bytes())));
     s.token = Some(token);
     s.config.acks.clear();
     save(&s)?;
     Ok(s.persistent)
 }
+
+#[tauri::command]
+async fn start_pairing(state: State<'_, AppState>, pairing: State<'_, Pairing>) -> Result<Value> {
+    let state = state.inner().clone();
+    let pairing = pairing.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let token = {
+            let s = state.0.lock().unwrap();
+            if s.keyring_loading || s.busy {
+                return Err("Wait until loading or upload finishes".into());
+            }
+            s.token.clone()
+        };
+        let client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(20))
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|_| "Cannot connect")?;
+        let mut request = client.post(format!("{}/device-link/start", api_base()));
+        if let Some(t) = &token {
+            request = request.bearer_auth(t);
+        }
+        let response = request.send().map_err(|_| "Account service unavailable")?;
+        if !response.status().is_success() {
+            return Err(
+                "Could not start account connection. Check your existing token or retry later."
+                    .into(),
+            );
+        }
+        let result: Value = response.json().map_err(|_| "Invalid account response")?;
+        let code = result["deviceCode"]
+            .as_str()
+            .ok_or("Missing pairing code")?
+            .to_string();
+        let user_code = result["userCode"].as_str().ok_or("Missing device code")?;
+        if code.len() > 100
+            || user_code.len() != 10
+            || !user_code.bytes().all(|b| b.is_ascii_hexdigit())
+        {
+            return Err("Invalid pairing response".into());
+        }
+        *pairing.0.lock().unwrap() = Some((code, token));
+        // Construct the browser destination ourselves; never execute a server-supplied URL.
+        let url = format!("{}/account.html", api_base().trim_end_matches("/api"));
+        #[cfg(target_os = "linux")]
+        let opened = std::process::Command::new("xdg-open")
+            .arg(&url)
+            .spawn()
+            .is_ok();
+        #[cfg(target_os = "macos")]
+        let opened = std::process::Command::new("open").arg(&url).spawn().is_ok();
+        #[cfg(target_os = "windows")]
+        let opened = std::process::Command::new("rundll32.exe")
+            .args(["url.dll,FileProtocolHandler", &url])
+            .spawn()
+            .is_ok();
+        Ok(json!({"userCode":user_code,"url":url,"browserOpened":opened}))
+    })
+    .await
+    .map_err(|_| "Account connection task failed")?
+}
+
+#[tauri::command]
+async fn poll_pairing(state: State<'_, AppState>, pairing: State<'_, Pairing>) -> Result<Value> {
+    let state = state.inner().clone();
+    let pairing = pairing.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let (code, original_token) = pairing
+            .0
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or("No account connection pending")?;
+        let client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(20))
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|_| "Cannot connect")?;
+        let response = client
+            .post(format!("{}/device-link/poll", api_base()))
+            .json(&json!({"deviceCode":code}))
+            .send()
+            .map_err(|_| "Account service unavailable")?;
+        if response.status().as_u16() == 429 {
+            return Ok(json!({"status":"pending"}));
+        }
+        if !response.status().is_success() {
+            return Err("Connection expired or failed. Please start again.".into());
+        }
+        let result: Value = response.json().map_err(|_| "Invalid account response")?;
+        if result["status"] != "linked" {
+            return Ok(json!({"status":"pending"}));
+        }
+        let mut pending = pairing.0.lock().unwrap();
+        if pending.as_ref().map(|p| &p.0) != Some(&code) {
+            return Err("Connection was cancelled".into());
+        }
+        let mut s = state.0.lock().unwrap();
+        if s.token != original_token || (s.busy && original_token.is_none()) {
+            return Err("Upload access changed. Please reconnect after uploads finish.".into());
+        }
+        if original_token.is_none() {
+            let token = result["token"]
+                .as_str()
+                .ok_or("Missing upload access")?
+                .to_string();
+            if !(30..=100).contains(&token.len())
+                || !token
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"_-".contains(&b))
+            {
+                return Err("Invalid upload access".into());
+            }
+            s.persistent = key()
+                .and_then(|k| k.set_password(&token).map_err(|_| "Keyring locked".into()))
+                .is_ok();
+            s.config.token_digest = Some(format!("{:x}", Sha256::digest(token.as_bytes())));
+            s.token = Some(token);
+            s.config.acks.clear();
+        }
+        s.config.account_linked = true;
+        s.keyring_loading = false;
+        save(&s)?;
+        *pending = None;
+        Ok(json!({"status":"linked"}))
+    })
+    .await
+    .map_err(|_| "Account connection task failed")?
+}
+
+#[tauri::command]
+fn cancel_pairing(pairing: State<Pairing>) {
+    *pairing.0.lock().unwrap() = None;
+}
+
 fn outbox_path(s: &Inner, token: &str, id: &str) -> PathBuf {
     s.config_file
         .parent()
@@ -756,6 +896,7 @@ async fn delete_data(state: State<'_, AppState>) -> Result<()> {
             let _ = k.delete_credential();
         }
         i.token = None;
+        i.config.account_linked = false;
         i.config.token_digest = None;
         i.persistent = false;
         i.config.acks.clear();
@@ -804,6 +945,7 @@ pub fn run() {
     }
     tauri::Builder::default()
         .manage(RestartTarget(Mutex::new(None)))
+        .manage(Pairing(Arc::new(Mutex::new(None))))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
@@ -918,6 +1060,9 @@ pub fn run() {
             set_choice,
             preview,
             set_token,
+            start_pairing,
+            poll_pairing,
+            cancel_pairing,
             sync_now,
             hide_name,
             delete_data

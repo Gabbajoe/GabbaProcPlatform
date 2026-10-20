@@ -9,8 +9,12 @@ const de = {
   settings: "Einstellungen",
   tag: "Kleine App. Gemeinsame Erkenntnisse.",
   connect: "Account",
+  pairHelp:
+    "Melde dich im Browser an und bestätige den hier angezeigten Gerätecode. Dein bestehender Upload-Zugang bleibt erhalten.",
+  pairStart: "Mit Konto verbinden",
+  pairCancel: "Verbindung abbrechen",
   tokenHelp:
-    "Mit einer Einladung des Betreibers erhältst du auf gabbaproc.kellerkind.info einen Upload-Token. Er wird im System-Schlüsselbund gespeichert, andernfalls nur für diese Sitzung.",
+    "Alternativ einen bestehenden Upload-Token einfügen oder auf der Website erstellen. Er wird im System-Schlüsselbund gespeichert, andernfalls nur für diese Sitzung.",
   token: "Upload-Token",
   save: "Token speichern",
   characters: "Charaktere auswählen",
@@ -567,3 +571,63 @@ setInterval(
   },
   6 * 60 * 60 * 1000,
 );
+
+let pairingGeneration = 0;
+$("pairStart").onclick = async () => {
+  const generation = ++pairingGeneration;
+  $("pairStart").disabled = true;
+  $("pairStatus").textContent = text(
+    "Opening account connection…",
+    "Kontoverbindung wird geöffnet …",
+  );
+  try {
+    const pair = await invoke("start_pairing");
+    $("pairCancel").hidden = false;
+    const message = text(
+      `Device code: ${pair.userCode}. Sign in at ${pair.url} and approve this code.`,
+      `Gerätecode: ${pair.userCode}. Auf ${pair.url} anmelden und diesen Code bestätigen.`,
+    );
+    $("pairStatus").textContent = message;
+    const deadline = Date.now() + 600000;
+    while (generation === pairingGeneration && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 5500));
+      if (generation !== pairingGeneration) break;
+      const result = await invoke("poll_pairing");
+      if (result.status === "linked") {
+        $("pairStatus").textContent = text(
+          "Account connected. Upload selection remains unchanged.",
+          "Konto verbunden. Deine Upload-Auswahl bleibt erhalten.",
+        );
+        await overview();
+        return;
+      }
+    }
+    if (generation === pairingGeneration)
+      $("pairStatus").textContent = text(
+        "Connection expired. Please start again.",
+        "Verbindung abgelaufen. Bitte erneut starten.",
+      );
+  } catch (_) {
+    if (generation === pairingGeneration)
+      $("pairStatus").textContent = text(
+        "Connection failed. Check your access and try again.",
+        "Verbindung fehlgeschlagen. Bitte Zugang prüfen und erneut versuchen.",
+      );
+  } finally {
+    if (generation === pairingGeneration) {
+      $("pairStart").disabled = false;
+      $("pairCancel").hidden = true;
+      await invoke("cancel_pairing");
+    }
+  }
+};
+$("pairCancel").onclick = async () => {
+  pairingGeneration++;
+  await invoke("cancel_pairing");
+  $("pairCancel").hidden = true;
+  $("pairStart").disabled = false;
+  $("pairStatus").textContent = text(
+    "Connection cancelled.",
+    "Verbindung abgebrochen.",
+  );
+};

@@ -1,8 +1,10 @@
 # GabbaProc: OAuth-Anwendungen einrichten
 
-Stand: 20.10.2026. Dieser Plan beschreibt die geplante Integration. Die unten
-festgelegten Callback-Routen sind noch nicht implementiert; eine Registrierung
-allein aktiviert noch keinen Login. Bisher funktionieren Einladungs-/Geräte-Tokens.
+Stand: 21.10.2026. Discord, GitHub und E-Mail sind implementiert und live aktiviert.
+E-Mail-Anmeldung und Geräteverknüpfung wurden über öffentliches HTTPS geprüft.
+Der vollständige Discord-/GitHub-Login mit echter Anbieter-Freigabe muss noch vom
+Betreiber durchgespielt werden. Google, Microsoft und Apple bleiben deaktiviert.
+Bestehende Einladungs-/Geräte-Tokens funktionieren weiterhin.
 
 ## Reihenfolge und Aufgabenteilung
 
@@ -156,8 +158,13 @@ Quellen: [Apple Web-Konfiguration](https://developer.apple.com/help/account/capa
 
 ## E-Mail-Anmeldung
 
-Dafür wird keine OAuth-App registriert. Geplant: ein kurz gültiger Einmalcode per
-E-Mail, browsergebunden, mit begrenzten Versuchen und Versandlimits.
+Dafür wird keine OAuth-App registriert. Implementiert: ein achtstelliger Einmalcode
+mit zehn Minuten Laufzeit und höchstens fünf Eingabeversuchen. Die HTML-Mail enthält
+einen Anmelde-Button; die Textalternative enthält Code und Link. Der Link übergibt
+Code und Challenge im URL-Fragment, das nicht an den Webserver gesendet und nach
+dem Vorbelegen aus der Adresszeile entfernt wird. Die Bestätigung erfolgt im
+Browser der ursprünglichen Anfrage. Versandlimits: 5 pro Adresse, 10 pro IP und
+100 insgesamt je Stunde.
 
 `gabbaproc@kellerkind.info` ist als echtes Postfach eingerichtet; die bestehende
 Weiterleitung an `mail@nilskeller.de` ist erhalten. SMTP-Anmeldung über
@@ -167,7 +174,11 @@ müssen funktionieren. Kein Zugriff auf private Benutzer-Postfächer erforderlic
 
 ## Companion mit dem Konto verbinden
 
-1. In der App **Mit Konto verbinden** klicken.
+Die direkte Verknüpfung ist im lokalen AppImage 0.1.3-rc.1 enthalten. Für die
+veröffentlichte 0.1.2 auf der Kontoseite einen Token erzeugen oder den bestehenden
+Token ausdrücklich zuordnen.
+
+1. In der neuen App **Mit Konto verbinden** klicken.
 2. App fordert eine kurzlebige Geräte-Verknüpfung beim GabbaProc-Server an.
 3. Der normale Browser öffnet unsere Kontoseite; dort Anbieter oder E-Mail auswählen.
 4. Gerätecode vergleichen und Verbindung ausdrücklich bestätigen.

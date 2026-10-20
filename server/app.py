@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from .models import Upload, CATALOG, CATALOG_EN
 from .storage import init, connect, digest, lock
 from starlette.concurrency import run_in_threadpool
-from . import upload_queue
+from . import upload_queue, accounts
 from .config import postgres_enabled
 
 
@@ -25,6 +25,7 @@ async def lifespan(app):
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+app.include_router(accounts.router)
 MAX_BODY = 2 * 1024 * 1024
 
 

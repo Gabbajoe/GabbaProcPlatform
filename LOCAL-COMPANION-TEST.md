@@ -107,3 +107,19 @@ Development build dev.6 adds a subtle moving highlight to the active upload or
 processing track, including when no packet is confirmed yet. The highlight does
 not change packet percentages. It stops on pause, retry, errors and completion,
 and is disabled when the operating system requests reduced motion.
+
+
+## Accounts candidate — 0.1.3-rc.1
+
+`bash tools/build-local-appimage.sh --production-candidate` builds locally without
+publishing or invoking release workflows. Unlike the default dev build, this
+candidate uses the production HTTPS API, normal app identifier, preferences and
+keyring. Starting it refreshes the normal Linux launcher. The output is
+`desktop/target/local-build/GabbaProc-Companion-0.1.3-rc.1-x86_64.AppImage`.
+Do not run it concurrently with the installed production companion.
+
+Account → Connect account opens the website. Sign in, enter the displayed device
+code and approve. If an upload token already exists it is preserved, along with
+character ownership and pending packets. New devices receive a token through the
+native process, never through the page JavaScript. The default dev build remains
+isolated on localhost and is not suitable for testing the public account login.
