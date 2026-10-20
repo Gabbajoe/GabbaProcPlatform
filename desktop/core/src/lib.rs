@@ -493,13 +493,18 @@ pub fn install_desktop_entry(
         .replace('\\', "\\\\")
         .replace('\n', "\\n")
         .replace('\r', "\\r");
-    let entry = format!("[Desktop Entry]\nType=Application\nName=GabbaProc Companion\nComment=Upload your WoW proc exports\nExec={exec}\nIcon={icon_path}\nTerminal=false\nCategories=Utility;\nStartupWMClass=info.kellerkind.gabbaproc\n");
+    let entry = format!("[Desktop Entry]\nType=Application\nName=GabbaProc Companion\nComment=Upload your WoW proc exports\nExec={exec}\nIcon={icon_path}\nTerminal=false\nCategories=Utility;\nStartupWMClass=gabbaproc-companion\n");
     let temporary = applications.join(format!(".gabbaproc-{}.desktop.tmp", std::process::id()));
     fs::write(&temporary, entry)?;
-    fs::rename(
-        temporary,
-        applications.join("info.kellerkind.gabbaproc.desktop"),
-    )?;
+    fs::rename(temporary, applications.join("gabbaproc-companion.desktop"))?;
+    // Migrate our earlier launcher; do not remove an unrelated user entry.
+    let legacy = applications.join("info.kellerkind.gabbaproc.desktop");
+    if fs::read_to_string(&legacy).is_ok_and(|entry| {
+        entry.contains("Name=GabbaProc Companion\n")
+            && entry.contains("StartupWMClass=info.kellerkind.gabbaproc\n")
+    }) {
+        let _ = fs::remove_file(legacy);
+    }
     Ok(())
 }
 
@@ -622,11 +627,11 @@ mod tests {
             .unwrap()
             .collect::<Vec<_>>();
         assert_eq!(entries.len(), 1);
-        let text = fs::read_to_string(temp.join("applications/info.kellerkind.gabbaproc.desktop"))
-            .unwrap();
+        let text =
+            fs::read_to_string(temp.join("applications/gabbaproc-companion.desktop")).unwrap();
         assert!(text.contains("Exec=\"/new folder/GabbaProc.AppImage\""));
         assert!(!text.contains("/first/"));
-        assert!(text.contains("StartupWMClass=info.kellerkind.gabbaproc"));
+        assert!(text.contains("StartupWMClass=gabbaproc-companion"));
         assert_eq!(
             fs::read(temp.join("icons/hicolor/128x128/apps/info.kellerkind.gabbaproc.png"))
                 .unwrap(),
