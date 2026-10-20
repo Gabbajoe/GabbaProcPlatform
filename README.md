@@ -11,7 +11,7 @@ Community proc research for WoW Classic Era / Hardcore. Website, API and lightwe
 ## How it works
 
 1. Install GabbaProcTracker. Collect combat data, use `/reload` or log out (automatic export since addon 0.1.1; older versions need `/gpt export` first).
-2. Install the companion for Windows, macOS or Linux. It uses the operating system WebView, without shipping Chromium.
+2. Install the companion for Windows, macOS or Linux.
 3. Get a single-use pilot invite from the operator and exchange it on the website for an upload token.
 4. Save the token in the app. Select characters; uploads are anonymous by default. Public character name and realm are an explicit per-character choice.
 5. Enable automatic uploads if desired. Changed exports upload every minute while the app is open. Closing the window quits the app. Start-at-login and signed automatic app updates are optional.
@@ -20,7 +20,13 @@ The app searches common Battle.net, Wine, Faugus and Steam prefixes. A manual Wo
 
 Upload tokens go into the OS keyring. If unavailable, the app retains the token only in memory until it quits. Preferences contain local folder paths and character UUIDs, but no upload token. App downloads and signed update artifacts are hosted on GitHub Releases.
 
-**Linux:** the small `.deb` uses installed WebKitGTK libraries; the larger AppImage includes more runtime libraries for portability. The pinned updater **2.14.0 supports both formats**, including native DEB installation through `dpkg`. A system-installed DEB update can require an administrator authorization prompt; an AppImage in your writable applications folder normally does not. [Pinned updater implementation](https://docs.rs/crate/tauri-plugin-updater/2.14.0/source/src/updater.rs).
+**Linux:** download the `.rpm` for Fedora, the `.deb` for Debian/Ubuntu, or the AppImage for a portable installation. Install the Fedora package with:
+
+```sh
+sudo dnf install ./GabbaProc.Companion-*.x86_64.rpm
+```
+
+Automatic updates support all three formats. Updating a system-installed RPM or DEB can ask for administrator authorization; an AppImage in your writable applications folder normally does not.
 
 ## What the numbers mean
 

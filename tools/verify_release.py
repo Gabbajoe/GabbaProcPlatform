@@ -88,7 +88,7 @@ with tempfile.TemporaryDirectory() as temp:
         print("Verified:", name)
 checksums = []
 for asset in sorted(root.iterdir()):
-    if asset.name.endswith((".exe", ".dmg", ".deb", ".AppImage", ".tar.gz")):
+    if asset.name.endswith((".exe", ".dmg", ".deb", ".rpm", ".AppImage", ".tar.gz")):
         checksums.append(
             hashlib.sha256(asset.read_bytes()).hexdigest() + "  " + asset.name
         )

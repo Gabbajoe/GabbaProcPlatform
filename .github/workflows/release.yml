@@ -6,6 +6,11 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      rpm_only:
+        description: Add only an RPM to the current version (verify and merge updater manifest afterwards)
+        type: boolean
+        default: false
 permissions:
   contents: write
 jobs:
@@ -26,15 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-22.04
-            args: '--bundles deb,appimage'
-          - os: windows-latest
-            args: '--bundles nsis'
-          - os: macos-15
-            args: '--target aarch64-apple-darwin --bundles dmg,app'
-          - os: macos-15-intel
-            args: '--target x86_64-apple-darwin --bundles dmg,app'
+        include: ${{ fromJSON(inputs.rpm_only && '[{"os":"ubuntu-22.04","args":"--bundles rpm"}]' || '[{"os":"ubuntu-22.04","args":"--bundles deb,rpm,appimage"},{"os":"windows-latest","args":"--bundles nsis"},{"os":"macos-15","args":"--target aarch64-apple-darwin --bundles dmg,app"},{"os":"macos-15-intel","args":"--target x86_64-apple-darwin --bundles dmg,app"}]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -62,7 +59,7 @@ jobs:
           tagName: v__VERSION__
           releaseName: GabbaProc Companion v__VERSION__
           releaseBody: 'Small native-webview companion. See README for setup, privacy and platform signing limitations.'
-          releaseDraft: true
+          releaseDraft: ${{ !inputs.rpm_only }}
           prerelease: false
-          includeUpdaterJson: true
+          includeUpdaterJson: ${{ !inputs.rpm_only }}
           args: ${{ matrix.args }}
