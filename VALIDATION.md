@@ -14,3 +14,11 @@ Companion source: `cb7b344b358441519779fc90e635baf3b60a95f8` (0.1.0). Later docu
 - Addon 0.1.1 logout/reload export regression tests pass in both locales. GitHub release and CurseForge upload succeeded.
 
 Still requiring real-device acceptance: Windows/macOS first launch, OS-specific keyring/autostart behavior, a complete upgrade from 0.1.0 to a later version, and prolonged real WoW collection. Initial installers do not have Microsoft Authenticode or Apple notarization identities; mandatory updater signatures are a separate mechanism. This release is an invitation-based community-data pilot, not an audited anti-cheat system.
+
+## Fedora RPM addition (2026-10-20)
+
+- GitHub Actions run 39367988544 built the additional 0.1.0 x86_64 RPM successfully; API/core validation and repository CI passed.
+- RPM metadata and file list inspected; MIT license, version 0.1.0-1, desktop entry and icons present. Download size: 3,941,383 bytes.
+- Fedora 44 `dnf --assumeno install` resolved the package plus WebKitGTK/JavaScriptCore dependencies. No system packages were installed. Native RPM GUI launch and a future RPM-to-RPM updater installation remain untested.
+- All six updater payloads independently verified against the compiled minisign public key. Added `linux-x86_64-rpm` while retaining the AppImage default and other format targets. Refreshed checksums.
+- Corrected an existing Windows manifest signature left stale by run 39338059130 failing during a concurrent manifest replacement. Release matrix uploads now run serially to prevent this race.

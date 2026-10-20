@@ -30,6 +30,8 @@ jobs:
     needs: validate
     strategy:
       fail-fast: false
+      # The action merges one shared latest.json; concurrent uploads can lose entries.
+      max-parallel: 1
       matrix:
         include: ${{ fromJSON(inputs.rpm_only && '[{"os":"ubuntu-22.04","args":"--bundles rpm"}]' || '[{"os":"ubuntu-22.04","args":"--bundles deb,rpm,appimage"},{"os":"windows-latest","args":"--bundles nsis"},{"os":"macos-15","args":"--target aarch64-apple-darwin --bundles dmg,app"},{"os":"macos-15-intel","args":"--target x86_64-apple-darwin --bundles dmg,app"}]') }}
     runs-on: ${{ matrix.os }}
