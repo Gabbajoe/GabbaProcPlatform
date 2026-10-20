@@ -183,7 +183,7 @@ async function scan() {
 $("lang").onchange = () => {
   lang = $("lang").value;
   language();
-  run(scan);
+  run(async () => { await overview(); await scan(); });
 };
 $("scan").onclick = () => run(scan);
 $("folder").onclick = () =>
@@ -263,7 +263,7 @@ async function update(manual) {
       text("Installing signed update…", "Signiertes Update wird installiert…"),
     );
     await u.downloadAndInstall();
-    await window.__TAURI__.process.relaunch();
+    await invoke("restart_after_update", { version: u.version });
   } finally {
     updating = false;
   }
@@ -285,6 +285,7 @@ run(async () => {
   await overview();
   await scan();
   $("startup").checked = await window.__TAURI__.autostart.isEnabled();
+  if ($("startup").checked) await window.__TAURI__.autostart.enable();
   if ($("updates").checked) await update(false);
 });
 setInterval(

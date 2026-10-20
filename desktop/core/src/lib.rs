@@ -475,6 +475,61 @@ pub fn desktop_exec(path: &str) -> std::result::Result<String, String> {
     Ok(quoted)
 }
 
+/// Keep one user launcher pointing at the currently launched application.
+pub fn install_desktop_entry(
+    data: &Path,
+    executable: &Path,
+    icon_bytes: &[u8],
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let exec = desktop_exec(&executable.to_string_lossy())?;
+    let applications = data.join("applications");
+    let icons = data.join("icons/hicolor/128x128/apps");
+    fs::create_dir_all(&applications)?;
+    fs::create_dir_all(&icons)?;
+    let icon = icons.join("info.kellerkind.gabbaproc.png");
+    fs::write(&icon, icon_bytes)?;
+    let icon_path = icon
+        .to_string_lossy()
+        .replace('\\', "\\\\")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r");
+    let entry = format!("[Desktop Entry]\nType=Application\nName=GabbaProc Companion\nComment=Upload your WoW proc exports\nExec={exec}\nIcon={icon_path}\nTerminal=false\nCategories=Utility;\nStartupWMClass=info.kellerkind.gabbaproc\n");
+    let temporary = applications.join(format!(".gabbaproc-{}.desktop.tmp", std::process::id()));
+    fs::write(&temporary, entry)?;
+    fs::rename(
+        temporary,
+        applications.join("info.kellerkind.gabbaproc.desktop"),
+    )?;
+    Ok(())
+}
+
+/// Move an installed update without overwriting another download.
+/// A hard link keeps the operation no-clobber; the old file survives on failure.
+pub fn versioned_appimage(current: &Path, version: &str) -> std::result::Result<PathBuf, String> {
+    if version.is_empty()
+        || version.len() > 64
+        || !version.starts_with(|c: char| c.is_ascii_digit())
+        || !version
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+'))
+    {
+        return Err("Invalid update version".into());
+    }
+    if !fs::symlink_metadata(current).is_ok_and(|m| m.is_file()) {
+        return Err("AppImage is not a regular file".into());
+    }
+    let target = current.with_file_name(format!("GabbaProc.Companion_{version}_amd64.AppImage"));
+    if target == current {
+        return Ok(target);
+    }
+    fs::hard_link(current, &target).map_err(|_| "Update installed, but the versioned filename already exists or this filesystem cannot rename safely. The original AppImage is still available.")?;
+    if fs::remove_file(current).is_err() {
+        let _ = fs::remove_file(&target);
+        return Err("Cannot rename updated AppImage; original file retained".into());
+    }
+    Ok(target)
+}
+
 pub fn discover(roots: &[PathBuf]) -> Vec<PathBuf> {
     let mut result = HashSet::new();
     let mut visited = 0usize;
@@ -550,6 +605,50 @@ mod tests {
         assert_eq!(desktop_exec("/a%f/app").unwrap(), "\"/a%%f/app\"");
         assert!(desktop_exec("/a\nExec=bad").is_err());
         assert!(desktop_exec("/a$`\"/app").unwrap().contains("\\\\$"));
+    }
+    #[test]
+    fn launcher_tracks_moved_appimage_without_duplicate_entries() {
+        let temp = std::env::temp_dir().join(format!(
+            "gabbaproc-launcher-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        install_desktop_entry(&temp, Path::new("/first/GabbaProc.AppImage"), b"icon").unwrap();
+        install_desktop_entry(&temp, Path::new("/new folder/GabbaProc.AppImage"), b"icon").unwrap();
+        let entries = fs::read_dir(temp.join("applications"))
+            .unwrap()
+            .collect::<Vec<_>>();
+        assert_eq!(entries.len(), 1);
+        let text = fs::read_to_string(temp.join("applications/info.kellerkind.gabbaproc.desktop"))
+            .unwrap();
+        assert!(text.contains("Exec=\"/new folder/GabbaProc.AppImage\""));
+        assert!(!text.contains("/first/"));
+        assert!(text.contains("StartupWMClass=info.kellerkind.gabbaproc"));
+        assert_eq!(
+            fs::read(temp.join("icons/hicolor/128x128/apps/info.kellerkind.gabbaproc.png"))
+                .unwrap(),
+            b"icon"
+        );
+        fs::remove_dir_all(temp).unwrap();
+    }
+    #[test]
+    fn update_rename_preserves_payload_and_never_overwrites() {
+        let temp = std::env::temp_dir().join(format!("gabbaproc-rename-{}", std::process::id()));
+        fs::create_dir_all(&temp).unwrap();
+        let old = temp.join("custom.AppImage");
+        fs::write(&old, b"signed update bytes").unwrap();
+        let new = versioned_appimage(&old, "0.1.2").unwrap();
+        assert!(!old.exists());
+        assert_eq!(fs::read(&new).unwrap(), b"signed update bytes");
+        fs::write(&old, b"another download").unwrap();
+        assert!(versioned_appimage(&old, "0.1.2").is_err());
+        assert_eq!(fs::read(&old).unwrap(), b"another download");
+        assert_eq!(fs::read(&new).unwrap(), b"signed update bytes");
+        assert!(versioned_appimage(&old, "../../bad").is_err());
+        fs::remove_dir_all(temp).unwrap();
     }
     #[test]
     fn accepts_tables_and_utf8() {

@@ -20,6 +20,8 @@ The app searches common Battle.net, Wine, Faugus and Steam prefixes. A manual Wo
 
 Upload tokens go into the OS keyring. If unavailable, the app retains the token only in memory until it quits. Preferences contain local folder paths and character UUIDs, but no upload token. App downloads and signed update artifacts are hosted on GitHub Releases.
 
+On Linux, the app creates a user start-menu entry and icon. Starting an AppImage again after moving or renaming it refreshes that entry to its current path. After a signed in-app update, the AppImage is renamed to include its new version and the launcher is refreshed before restart. Existing files are never overwritten by this rename.
+
 **Linux:** download the `.rpm` for Fedora, the `.deb` for Debian/Ubuntu, or the AppImage for a portable installation. Install the Fedora package with:
 
 ```sh

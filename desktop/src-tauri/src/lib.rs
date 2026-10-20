@@ -43,6 +43,7 @@ struct Inner {
 }
 #[derive(Clone)]
 struct AppState(Arc<Mutex<Inner>>);
+struct RestartTarget(Mutex<Option<PathBuf>>);
 fn key() -> Result<keyring::Entry> {
     keyring::Entry::new("info.kellerkind.gabbaproc", "upload-token")
         .map_err(|_| "System keyring unavailable".into())
@@ -173,6 +174,31 @@ fn set_interval(minutes: u64, state: State<AppState>) -> Result<()> {
 #[tauri::command]
 fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
+}
+
+#[tauri::command]
+fn restart_after_update(version: String, app: tauri::AppHandle) -> Result<()> {
+    #[cfg(target_os = "linux")]
+    if let Some(current) = app.env().appimage {
+        let current = PathBuf::from(current);
+        let target = gabbaproc_core::versioned_appimage(&current, &version)?;
+        // Refresh the launcher before leaving this process, too.
+        if let Err(e) = register_linux_desktop_for(&target) {
+            // Restore the original name so the existing launcher remains usable.
+            if current != target {
+                let _ = fs::hard_link(&target, &current).and_then(|_| fs::remove_file(&target));
+            }
+            return Err(format!(
+                "Update installed, but launcher refresh failed: {e}"
+            ));
+        }
+        *app.state::<RestartTarget>().0.lock().unwrap() = Some(target);
+        app.exit(0);
+        return Ok(());
+    }
+    let _ = version;
+    app.request_restart();
+    Ok(())
 }
 
 fn tray_menu(app: &tauri::AppHandle, german: bool) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
@@ -415,42 +441,35 @@ async fn delete_data(state: State<'_, AppState>) -> Result<()> {
     .map_err(|_| "Delete task failed")?
 }
 #[cfg(target_os = "linux")]
-fn register_linux_desktop() -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn register_linux_desktop_for(
+    executable: &std::path::Path,
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let data = std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
         .filter(|p| p.is_absolute())
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))
         .ok_or("No user data directory")?;
-    let executable = std::env::var_os("APPIMAGE")
-        .map(PathBuf::from)
-        .filter(|p| p.is_absolute() && p.is_file())
-        .unwrap_or(std::env::current_exe()?);
-    let exec = gabbaproc_core::desktop_exec(&executable.to_string_lossy())?;
-    let applications = data.join("applications");
-    let icons = data.join("icons/hicolor/128x128/apps");
-    fs::create_dir_all(&applications)?;
-    fs::create_dir_all(&icons)?;
-    let icon = icons.join("info.kellerkind.gabbaproc.png");
-    fs::write(&icon, include_bytes!("../icons/128x128.png"))?;
-    let icon_path = icon
-        .to_string_lossy()
-        .replace('\\', "\\\\")
-        .replace('\n', "\\n")
-        .replace('\r', "\\r");
-    let entry = format!("[Desktop Entry]\nType=Application\nName=GabbaProc Companion\nComment=Upload your WoW proc exports\nExec={exec}\nIcon={icon_path}\nTerminal=false\nCategories=Utility;\nStartupWMClass=info.kellerkind.gabbaproc\n");
-    fs::write(
-        applications.join("info.kellerkind.gabbaproc.desktop"),
-        entry,
+    gabbaproc_core::install_desktop_entry(
+        &data,
+        &executable,
+        include_bytes!("../icons/128x128.png"),
     )?;
     Ok(())
 }
 
 pub fn run() {
     #[cfg(target_os = "linux")]
-    if let Err(e) = register_linux_desktop() {
-        eprintln!("Desktop icon registration failed: {e}");
+    {
+        let executable = std::env::var_os("APPIMAGE")
+            .map(PathBuf::from)
+            .filter(|p| p.is_absolute() && p.is_file())
+            .unwrap_or_else(|| std::env::current_exe().expect("Cannot locate application"));
+        if let Err(e) = register_linux_desktop_for(&executable) {
+            eprintln!("Desktop icon registration failed: {e}");
+        }
     }
     tauri::Builder::default()
+        .manage(RestartTarget(Mutex::new(None)))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
@@ -526,6 +545,7 @@ pub fn run() {
             set_interval,
             set_language,
             quit_app,
+            restart_after_update,
             set_choice,
             preview,
             set_token,
@@ -533,6 +553,19 @@ pub fn run() {
             hide_name,
             delete_data
         ])
-        .run(tauri::generate_context!())
-        .expect("Could not start GabbaProc Companion");
+        .build(tauri::generate_context!())
+        .expect("Could not start GabbaProc Companion")
+        .run(|app, event| {
+            #[cfg(target_os = "linux")]
+            if let tauri::RunEvent::Exit = event {
+                if let Some(target) = app.state::<RestartTarget>().0.lock().unwrap().take() {
+                    let mut env = app.env();
+                    env.appimage = Some(target.into_os_string());
+                    app.cleanup_before_exit();
+                    tauri::process::restart(&env);
+                }
+            }
+            #[cfg(not(target_os = "linux"))]
+            let _ = (app, event);
+        });
 }
