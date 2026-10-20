@@ -74,3 +74,11 @@ Ein Export im Addon plus `/reload` oder Ausloggen schreibt die Datei auf die Fes
 Choose a username on the account page; the website and connected companion display it beside the language selector. Browser sessions last up to 14 days. Companion access has no automatic expiry and can be disconnected or revoked without deleting contributions. Reconnecting the same device preserves ownership and its local upload queue.
 
 Auto-upload, interval and bandwidth are in **Sync**. **Settings** contains autostart, updates and the option to minimize to the tray when closing (enabled by default). The tray reports connection and synchronization status, including the next automatic export check. Character previews open beneath the selected character. The bottom status bar stays visible across tabs. Click the logo/title to open the website, or the source link in the footer to open GitHub.
+
+### Raid-test data and analysis (0.1.3)
+
+Companion 0.1.3 imports addon export schemas 1 and 2. New segment telemetry is projected through an explicit allowlist; numeric equipment/talent context, available stat/buff samples, attack outcomes, relative proc times and target counts are retained. No raw combat log, item links, target GUIDs or target names are uploaded. Field limits are enforced again by the server. Legacy segments have no inferred telemetry.
+
+[Combat analysis](https://gabbaproc.kellerkind.info/analysis.html) shows environment rates, duration groups, zero-proc proportions, count distribution, duration/proc scatter and relative timing histograms. Scope can be community or the signed-in account. The initial view scans at most 500 recent archived segments to bound server work; it is not an all-history aggregation. Rates use total eligible seconds, not averages of per-segment rates. Damage-event counts are not effect-specific trigger attempts. Timing summaries exclude truncated combat detail; sampled buffs do not establish exact uptime. Further controlled raid validation is required.
+
+Language is configured under Settings: System language (English fallback), Deutsch or English. The header displays the connected account. Header/footer span the window width; the desktop window has a fixed 920 × 780 size.

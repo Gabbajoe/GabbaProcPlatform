@@ -491,3 +491,38 @@ def test_effect_names_available_in_both_languages(api, sample):
     row = api.get("/api/stats").json()["rows"][0]
     assert row["names"] == {"de": "Kreuzfahrer", "en": "Crusader"}
     assert row["name"] == "Kreuzfahrer"  # old clients keep the existing field
+
+
+def detail():
+    return {"version":1,"fightId":1,"classId":1,"level":60,"equipment":[{"slot":16,"itemId":12590,"enchantId":1900}],"talents":[],"samples":[{"atMs":0,"stats":{"meleeCrit":25.0},"buffs":[]}],"attacks":[{"kind":"swing","spellId":0,"hand":"main","outcome":"crit","count":10}],"procTimes":[{"spellId":20007,"atMs":3000},{"spellId":20007,"atMs":60000}],"targets":1,"truncated":False}
+
+
+def test_telemetry_import_analysis_and_validation(api, sample, monkeypatch):
+    monkeypatch.setenv("GABBAPROC_ACCOUNTS", "true")
+    from server.models import Upload
+    old=Upload.model_validate(sample).model_dump()
+    assert 'telemetry' not in old['segments'][0]  # Legacy checksums remain stable.
+    sample['segments'][0]['telemetry']=detail()
+    assert api.post('/api/imports',json=sample).status_code==200
+    result=api.get('/api/analysis?spellId=20007').json()
+    assert result['areas'][0]['ppm']==1
+    assert result['buckets'][3]['segments']==1
+    assert result['timeline'][0]==1 and result['timeline'][2]==1
+    assert result['meta']['observedCritEvents']==10
+    assert api.get('/api/analysis?spellId=20007&scope=mine').status_code==401
+    for mutation in ('name','time','count','stats'):
+        bad=copy.deepcopy(sample)
+        t=bad['segments'][0]['telemetry']
+        if mutation=='name':t['targetName']='private'
+        if mutation=='time':t['procTimes'][0]['atMs']=999999
+        if mutation=='count':t['procTimes']*=3
+        if mutation=='stats':t['samples'][0]['stats']['email']='private@example.org'
+        assert api.post('/api/imports',json=bad).status_code==422
+
+
+def test_active_telemetry_cannot_rewrite_history(api, sample):
+    sample['segments'][0].update(status='active',telemetry=detail())
+    assert api.post('/api/imports',json=sample).status_code==200
+    sample['sequence']=2
+    sample['segments'][0]['telemetry']['procTimes'][0]['atMs']=4000
+    assert api.post('/api/imports',json=sample).status_code==409

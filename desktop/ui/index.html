@@ -10,6 +10,7 @@
     <p id="localBuild" hidden data-t="localBuild">
       Local test build: uploads go only to the local test server.
     </p>
+    <div class="top-bar">
     <header>
       <a id="websiteLink" class="brand" href="https://gabbaproc.kellerkind.info/" aria-label="GabbaProc website"><img src="logo.png" alt="" />
       <div>
@@ -18,10 +19,7 @@
       </div>
       </a>
       <span id="connection" class="connection" role="status"></span
-      ><select id="lang" aria-label="Language">
-        <option value="en">English</option>
-        <option value="de">Deutsch</option>
-      </select>
+      >
     </header>
     <nav class="tabs" role="tablist" aria-label="Navigation">
       <button
@@ -66,6 +64,7 @@
         Settings
       </button>
     </nav>
+    </div>
     <main>
       <div
         id="panel-characters"
@@ -184,6 +183,7 @@
       >
         <section>
           <h2 data-t="settings">Settings</h2>
+<label><span data-t="languageLabel">Language</span><select id="lang" aria-label="Language"><option value="auto" data-t="systemLanguage">System language</option><option value="de">Deutsch</option><option value="en">English</option></select></label>
 <label
             ><input type="checkbox" id="startup" /><span data-t="startup"
               >Start when I log in</span

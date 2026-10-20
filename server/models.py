@@ -1,8 +1,9 @@
 from typing import Literal
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, model_serializer
 import json
 from pathlib import Path
+from .telemetry import Telemetry
 
 CATALOG = json.loads((Path(__file__).parent / "catalog.json").read_text())
 CATALOG_EN = json.loads((Path(__file__).parent / "catalog-en.json").read_text())
@@ -50,11 +51,31 @@ class Segment(Strict):
     seconds: float = Field(ge=0, le=604800)
     status: Literal["active", "complete"]
     rows: list[Event] = Field(max_length=200)
+    telemetry: Telemetry | None = None
+    startedAt: int | None = Field(default=None, ge=946684800, le=4102444800)
+
+    @model_serializer(mode="wrap")
+    def serialize(self, handler):
+        result = handler(self)
+        for key in ("telemetry", "startedAt"):
+            if result.get(key) is None:
+                result.pop(key, None)
+        return result
 
     @model_validator(mode="after")
     def check(self):
         if len({r.spellId for r in self.rows}) != len(self.rows):
             raise ValueError("duplicate effect")
+        if self.telemetry:
+            t = self.telemetry
+            if any(p.atMs > self.seconds * 1000 + 1 for p in [*t.samples, *t.procTimes]):
+                raise ValueError("measurement beyond segment end")
+            counts = {}
+            for p in t.procTimes:
+                counts[p.spellId] = counts.get(p.spellId, 0) + 1
+            rows = {r.spellId:r.procs for r in self.rows}
+            if any(n > rows.get(spell, 0) for spell,n in counts.items()):
+                raise ValueError("proc timeline exceeds counts")
         return self
 
 

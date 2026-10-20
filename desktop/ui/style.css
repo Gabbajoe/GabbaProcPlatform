@@ -388,3 +388,15 @@ select option { background: #172235; color: #edf5ff; }
 
 .sync-controls { display: flex; align-items: center; gap: 12px 24px; flex-wrap: wrap; margin: 8px 0 12px; }
 .sync-controls label { margin: 0; white-space: nowrap; }
+
+.connection { color: #e7edf7; font-size: 13px; font-weight: 600; max-width: 240px; }
+.connection[data-ready="true"] { color: #e7edf7; }
+.connection[data-ready="true"]::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #7de0d0; margin-right: 8px; }
+
+.top-bar { flex-shrink: 0; background: #182a43; margin: -16px -24px 12px; padding: 16px 24px 0; border-bottom: 1px solid #466588; }
+.top-bar .tabs { border-bottom: 0; margin-bottom: 0; }
+.bottom-bar { background: #182a43; border-color: #466588; }
+.top-bar .tabs button { background: #284666; color: #edf5ff; border-color: #537da5; }
+.top-bar .tabs button:hover { background: #315779; }
+.top-bar .tabs button[aria-selected="true"] { background: #37658e; border-color: #8ac8ff; color: white; }
+.global-status pre { font-family: inherit; font-size: 13px; line-height: 1.5; }

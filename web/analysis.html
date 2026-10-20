@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Community proc measurements for WoW Classic Era and Hardcore. Compare observed effects across Open World, dungeons and raids."
+    />
+    <title>GabbaProc · Combat analysis</title>
+    <link rel="icon" href="/assets/logo.png" />
+    <link rel="stylesheet" href="/assets/site.css" />
+    <script src="/assets/site.js" defer></script>
+  <script src="/assets/analysis.js" defer></script>
+</head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="masthead">
+      <a class="brand" href="/"
+        ><img src="/assets/logo.png" alt="" width="36" height="36" /><b
+          >Gabba<span>Proc</span></b
+        ></a
+      ><span class="edition">CLASSIC ERA / HARDCORE</span>
+      <div id="language" role="group" aria-label="Language / Sprache">
+        <button
+          type="button"
+          data-language="de"
+          aria-label="Deutsch"
+          aria-pressed="false"
+        >
+          DE</button
+        ><button
+          type="button"
+          data-language="en"
+          aria-label="English"
+          aria-pressed="false"
+        >
+          EN
+        </button>
+      </div>
+    </header>
+    <div class="layout">
+      <aside>
+        <nav aria-label="Main">
+          <a href="/"
+            ><span data-en="Observations" data-de="Messwerte"
+              >Observations</span
+            ></a
+          ><a href="/compare.html"
+            ><span data-en="Compare effects" data-de="Effekte vergleichen"
+              >Compare effects</span
+            ></a
+          ><a href="/analysis.html" aria-current="page"><span data-en="Combat analysis" data-de="Kampfauswertung">Combat analysis</span></a>
+          <a href="/quality.html"
+            ><span
+              data-en="Method &amp; data quality"
+              data-de="Methodik &amp; Datenqualität"
+              >Method &amp; data quality</span
+            ></a
+          ><a href="/downloads.html"
+            ><span
+              data-en="Addon &amp; companion"
+              data-de="Addon &amp; Companion"
+              >Addon &amp; companion</span
+            ></a
+          ><a href="/account.html"
+            ><span data-en="My account" data-de="Mein Konto"
+              >My account</span
+            ></a
+          >
+        </nav>
+        <div class="side-note">
+          <strong
+            data-en="Community measurements"
+            data-de="Messwerte der Community"
+            >Community measurements</strong
+          >
+          <p data-en="Open source · EN / DE" data-de="Open Source · DE / EN">
+            Open source · EN / DE
+          </p>
+          <a href="https://github.com/Gabbajoe/GabbaProcPlatform">GitHub ↗</a>
+        </div>
+      </aside>
+      <main id="main">
+<h1 data-en="Combat analysis" data-de="Kampfauswertung">Combat analysis</h1>
+<p data-en="Compare completed combat segments. Equipment changes split a fight into segments. Rates use eligible combat time; damage events are not proc opportunities." data-de="Vergleiche abgeschlossene Kampfsegmente. Ausrüstungswechsel teilen einen Kampf. Raten verwenden relevante Kampfzeit; Schadensereignisse sind keine Proc-Auslöseversuche.">Compare completed combat segments. Equipment changes split a fight into segments. Rates use eligible combat time; damage events are not proc opportunities.</p>
+<form id="analysis-filters" class="filters">
+<label><span data-en="Effect" data-de="Effekt">Effect</span><select id="analysis-effect"></select></label>
+<label><span data-en="Environment" data-de="Umgebung">Environment</span><select id="analysis-group"><option value="all" data-en="All" data-de="Alle">All</option><option value="world">Open World</option><option value="party" data-en="Dungeons" data-de="Dungeons">Dungeons</option><option value="raid">Raids</option></select></label>
+<label><span data-en="Data" data-de="Daten">Data</span><select id="analysis-scope"><option value="community">Community</option><option value="mine" data-en="My account" data-de="Mein Konto">My account</option></select></label>
+<label><span data-en="Class" data-de="Klasse">Class</span><select id="analysis-class"><option value="0" data-en="All / unknown" data-de="Alle / unbekannt">All / unknown</option><option value="1" data-en="Warrior" data-de="Krieger">Warrior</option><option value="2" data-en="Paladin" data-de="Paladin">Paladin</option><option value="3" data-en="Hunter" data-de="Jäger">Hunter</option><option value="4" data-en="Rogue" data-de="Schurke">Rogue</option><option value="5" data-en="Priest" data-de="Priester">Priest</option><option value="7" data-en="Shaman" data-de="Schamane">Shaman</option><option value="8" data-en="Mage" data-de="Magier">Mage</option><option value="9" data-en="Warlock" data-de="Hexenmeister">Warlock</option><option value="11" data-en="Druid" data-de="Druide">Druid</option></select></label>
+<button data-en="Analyze" data-de="Auswerten">Analyze</button></form>
+<p id="analysis-status" role="status"></p>
+<div class="analysis-grid">
+<section class="panel"><h2 data-en="Procs / combat minute by environment" data-de="Procs / Kampfminute nach Umgebung">Procs / combat minute by environment</h2><div id="area-chart"></div></section>
+<section class="panel"><h2 data-en="Proc rate by segment duration" data-de="Proc-Rate nach Segmentdauer">Proc rate by segment duration</h2><div id="duration-chart"></div></section>
+<section class="panel"><h2 data-en="Segments without a proc (%)" data-de="Segmente ohne Proc (%)">Segments without a proc (%)</h2><div id="zero-chart"></div></section>
+<section class="panel"><h2 data-en="Proc count distribution" data-de="Verteilung der Proc-Anzahl">Proc count distribution</h2><div id="distribution-chart"></div></section>
+<section class="panel"><h2 data-en="Duration and proc count" data-de="Dauer und Proc-Anzahl">Duration and proc count</h2><p data-en="Each point is a segment; x = seconds, y = procs. Up to 1,000 recent matching points." data-de="Jeder Punkt ist ein Segment; x = Sekunden, y = Procs. Bis zu 1.000 passende aktuelle Punkte.">Each point is a segment; x = seconds, y = procs. Up to 1,000 recent matching points.</p><div id="scatter-chart"></div></section>
+<section class="panel"><h2 data-en="Proc times within the segment" data-de="Proc-Zeitpunkte im Segment">Proc times within the segment</h2><p data-en="Counts in 30-second windows, not a proc chance. Only complete detail recordings; older exports have no timing data." data-de="Anzahl in 30-Sekunden-Fenstern, keine Proc-Chance. Nur vollständige Detailaufzeichnungen; ältere Exporte enthalten keine Zeitpunkte.">Counts in 30-second windows, not a proc chance. Only complete detail recordings; older exports have no timing data.</p><div id="timeline-chart"></div></section>
+</div>
+<h2 data-en="Sample sizes" data-de="Datenbasis">Sample sizes</h2><div id="analysis-table"></div>
+<p data-en="This view scans up to 500 recent archived segments. Small samples and different equipment or play styles can produce apparent differences. Stat/buff samples are bounded; incomplete detail recordings are marked and excluded from timing/event summaries. No per-hit proc chance or exact buff uptime is inferred." data-de="Diese Ansicht prüft bis zu 500 aktuelle archivierte Segmente. Kleine Stichproben, Ausrüstung und Spielweise können scheinbare Unterschiede verursachen. Werte-/Buff-Samples sind begrenzt; unvollständige Details werden markiert und aus Zeit-/Ereignisübersichten ausgeschlossen. Es wird keine Proc-Chance pro Treffer oder exakte Buff-Uptime abgeleitet.">This view scans up to 500 recent archived segments. Small samples and different equipment or play styles can produce apparent differences. Stat/buff samples are bounded; incomplete detail recordings are marked and excluded from timing/event summaries. No per-hit proc chance or exact buff uptime is inferred.</p>
+      </main>
+    </div>
+    <footer>
+      <span>GabbaProc</span
+      ><a href="/privacy.html"
+        ><span data-en="Privacy notice" data-de="Datenschutz"
+          >Privacy notice</span
+        ></a
+      ><a
+        href="mailto:gabbaproc@kellerkind.info"
+        data-en="Contact"
+        data-de="Kontakt"
+        >Contact</a
+      ><a href="/imprint.html"
+        ><span data-en="Legal notice" data-de="Impressum">Legal notice</span></a
+      >
+    </footer>
+  </body>
+</html>

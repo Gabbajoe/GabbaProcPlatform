@@ -282,12 +282,60 @@ pub fn known() -> HashSet<u64> {
 }
 /// Build a fresh allowlisted DTO. Raw names, paths, zones, stamps and effect names
 /// cannot leak through anonymous mode; executable Lua is never evaluated.
+// Explicit projection: do not forward untrusted free-form SavedVariables objects.
+fn telemetry(value: &Value, ids: &HashSet<u64>) -> Result<Value> {
+    if integer(&value["version"])? != 1 { return Err("Unsupported telemetry".into()); }
+    let mut out = json!({"version":1,"fightId":integer(&value["fightId"])?,"targets":integer(&value["targets"])?,"truncated":value["truncated"].as_bool().ok_or("Invalid telemetry flag")?});
+    out["samplesTruncated"] = json!(value["samplesTruncated"].as_bool().unwrap_or(false));
+    for key in ["classId", "level"] { if !value[key].is_null() { out[key] = json!(integer(&value[key])?); } }
+    for (key, fields, limit) in [
+        ("equipment", vec!["slot", "itemId", "enchantId"], 18),
+        ("talents", vec!["tab", "index", "rank"], 100),
+        ("procTimes", vec!["spellId", "atMs"], 1024),
+    ] {
+        let rows = entries(&value[key])?;
+        if rows.len() > limit { return Err("Telemetry limit exceeded".into()); }
+        let mut result = Vec::new();
+        for row in rows {
+            if key == "procTimes" && !ids.contains(&integer(&row["spellId"])?) { continue; }
+            let mut item = json!({});
+            for field in &fields { item[*field] = json!(integer(&row[*field])?); }
+            result.push(item);
+        }
+        out[key] = json!(result);
+    }
+    let attacks = entries(&value["attacks"])?;
+    if attacks.len()>256 { return Err("Too many attack counters".into()); }
+    let mut rows = Vec::new();
+    for row in attacks {
+        let kind=string(&row["kind"])?; let hand=string(&row["hand"])?; let outcome=string(&row["outcome"])?;
+        if !["swing","spell","ranged","periodic","cast"].contains(&kind) || !["main","off","none"].contains(&hand) || !["hit","crit","glancing","cast","MISS","DODGE","PARRY","BLOCK","RESIST","IMMUNE","EVADE","DEFLECT","ABSORB","REFLECT","other"].contains(&outcome) { return Err("Invalid attack type".into()); }
+        rows.push(json!({"kind":kind,"hand":hand,"outcome":outcome,"spellId":integer(&row["spellId"])?,"count":integer(&row["count"])?}));
+    }
+    out["attacks"] = json!(rows);
+    let samples = entries(&value["samples"])?;
+    if samples.len()>32 { return Err("Too many stat samples".into()); }
+    let mut rows=Vec::new();
+    for sample in samples {
+        let mut stats=json!({});
+        for key in ["meleeCrit","rangedCrit","meleeHitModifier","spellHitModifier","mainSpeed","offSpeed","rangedSpeed","haste","strength","agility","stamina","intellect","spirit","spellCrit1","spellCrit2","spellCrit3","spellCrit4","spellCrit5","spellCrit6","spellCrit7"] {
+            if !sample["stats"][key].is_null() { stats[key]=json!(number(&sample["stats"][key])?); }
+        }
+        let buffs=entries(&sample["buffs"])?;
+        if buffs.len()>40 { return Err("Too many buffs".into()); }
+        let buffs:Result<Vec<Value>>=buffs.into_iter().map(|b| Ok(json!({"spellId":integer(&b["spellId"])?,"stacks":integer(&b["stacks"])?}))).collect();
+        rows.push(json!({"atMs":integer(&sample["atMs"])?,"stats":stats,"buffs":buffs?}));
+    }
+    out["samples"]=json!(rows);
+    Ok(out)
+}
+
 pub fn payload(root: &Value, named: bool) -> Result<Value> {
     snapshot_payload(&root["export"], named, false)
 }
 
 fn snapshot_payload(e: &Value, named: bool, archive: bool) -> Result<Value> {
-    if integer(&e["schemaVersion"])? != 1 {
+    if ![1, 2].contains(&integer(&e["schemaVersion"])?) {
         return Err("Unsupported or missing export; export in the addon first".into());
     }
     let ids = known();
@@ -351,7 +399,12 @@ fn snapshot_payload(e: &Value, named: bool, archive: bool) -> Result<Value> {
         if !["active", "complete"].contains(&status) {
             return Err("Invalid segment status".into());
         }
-        segments.push(json!({"id":integer(&s["id"])?,"group":group(&s["context"])?,"seconds":number(&s["duration"])?,"status":status,"rows":rows}));
+        let mut segment=json!({"id":integer(&s["id"])?,"group":group(&s["context"])?,"seconds":number(&s["duration"])?,"status":status,"rows":rows});
+        if !s["telemetry"].is_null() {
+            segment["telemetry"]=telemetry(&s["telemetry"], &ids)?;
+            if !s["startedAt"].is_null() { segment["startedAt"]=json!(integer(&s["startedAt"])?); }
+        }
+        segments.push(segment);
     }
     if !archive && segments.len() > 301 {
         return Err("Too many segments".into());
@@ -714,6 +767,16 @@ mod tests {
         assert_eq!(fs::read(&new).unwrap(), b"signed update bytes");
         assert!(versioned_appimage(&old, "../../bad").is_err());
         fs::remove_dir_all(temp).unwrap();
+    }
+    #[test]
+    fn telemetry_projection_strips_private_fields_and_preserves_numeric_context() {
+        let raw=json!({"version":1,"fightId":7,"classId":1,"level":60,"targets":1,"truncated":false,"equipment":{"1":{"slot":16,"itemId":12590,"enchantId":1900,"link":"PRIVATE"}},"talents":{},"attacks":{"1":{"kind":"swing","hand":"off","outcome":"crit","spellId":0,"count":3,"target":"PRIVATE"}},"samples":{"1":{"atMs":0,"stats":{"meleeCrit":25.0,"name":"PRIVATE"},"buffs":{}}},"procTimes":{"1":{"spellId":20007,"atMs":2000},"2":{"spellId":9999999,"atMs":2001}},"name":"PRIVATE"});
+        let projected=telemetry(&raw,&known()).unwrap();
+        assert_eq!(projected["attacks"][0]["count"],3);
+        assert_eq!(projected["procTimes"].as_array().unwrap().len(),1);
+        assert!(!projected.to_string().contains("PRIVATE"));
+        let mut bad=raw.clone();bad["attacks"]["1"]["kind"]=json!("private");
+        assert!(telemetry(&bad,&known()).is_err());
     }
     #[test]
     fn accepts_tables_and_utf8() {

@@ -776,3 +776,14 @@ code {
     font-size: 20px;
   }
 }
+.analysis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 20px 0; }
+.analysis-grid .panel { min-width: 0; }
+.analysis-grid svg { width: 100%; }
+.analysis-bar { display: grid; grid-template-columns: 80px 1fr 65px; align-items: center; gap: 8px; margin: 8px 0; font-size: 13px; }
+.analysis-bar meter { width: 100%; accent-color: #6ab3ff; }
+#analysis-table { overflow: auto; }
+@media(max-width:1000px) { .analysis-grid { grid-template-columns: 1fr; } }
+
+.analysis-bar meter::-webkit-meter-bar { background: #293b52; border: 0; }
+.analysis-bar meter::-webkit-meter-optimum-value { background: #6ab3ff; }
+.analysis-bar meter::-moz-meter-bar { background: #6ab3ff; }

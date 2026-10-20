@@ -33,6 +33,8 @@ const de = {
   localBuild:
     "Lokale Testversion: Uploads gehen nur an den lokalen Testserver.",
   quit: "App beenden",
+  languageLabel: "Sprache",
+  systemLanguage: "Systemsprache",
   closeToTray: "Beim Schließen in den Infobereich minimieren",
   startup: "Bei der Anmeldung starten",
   updates: "Signierte App-Updates automatisch installieren (App startet neu)",
@@ -50,23 +52,20 @@ const de = {
 const original = new Map(
   [...document.querySelectorAll("[data-t]")].map((el) => [el, el.textContent]),
 );
-const savedLanguage = localStorage.getItem("language");
-let lang = ["de", "en"].includes(savedLanguage)
-  ? savedLanguage
-  : (navigator.languages?.[0] || navigator.language || "en")
-        .toLowerCase()
-        .startsWith("de")
-    ? "de"
-    : "en";
+let languageChoice = localStorage.getItem("languageChoice") || "auto";
+function resolvedLanguage() {
+  return ["de", "en"].includes(languageChoice) ? languageChoice : (navigator.languages?.[0] || navigator.language || "en").toLowerCase().startsWith("de") ? "de" : "en";
+}
+let lang = resolvedLanguage();
 function text(en, ger) {
   return lang === "de" ? ger : en;
 }
 function language() {
   document.documentElement.lang = lang;
-  $("lang").value = lang;
+  $("lang").value = languageChoice;
   for (const [el, en] of original)
     el.textContent = lang === "de" ? de[el.dataset.t] || en : en;
-  localStorage.setItem("language", lang);
+  localStorage.setItem("languageChoice", languageChoice);
   run(() => invoke("set_language", { language: lang }));
 }
 function status(v) {
@@ -510,7 +509,8 @@ for (const [index, button] of tabs.entries()) {
   };
 }
 $("lang").onchange = () => {
-  lang = $("lang").value;
+  languageChoice = $("lang").value;
+  lang = resolvedLanguage();
   language();
   run(async () => {
     await overview();

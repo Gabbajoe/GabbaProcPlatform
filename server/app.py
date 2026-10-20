@@ -316,7 +316,7 @@ def apply_segments(db, data, backfill=False):
             "SELECT sequence,data FROM segments WHERE character=? AND collection=? AND id=?",
             (*key, segment.id),
         ).fetchone()
-        value = segment.model_dump()
+        value = segment.model_dump(exclude_none=True)
         if previous:
             if (
                 backfill
@@ -331,6 +331,19 @@ def apply_segments(db, data, backfill=False):
                 raise HTTPException(409, "Completed segment changed")
             if previous["sequence"] >= data.sequence:
                 raise HTTPException(409, "Conflicting segment revision")
+            previous_details = before.get("telemetry")
+            details = value.get("telemetry")
+            if previous_details:
+                if not details or any(previous_details.get(k) != details.get(k) for k in ("version", "fightId", "classId", "level", "equipment", "talents")):
+                    raise HTTPException(409, "Segment context changed")
+                for field in ("samples", "procTimes"):
+                    old_entries = previous_details[field]
+                    if details[field][:len(old_entries)] != old_entries:
+                        raise HTTPException(409, "Segment detail history changed")
+                old_attacks = {(r["kind"],r["spellId"],r["hand"],r["outcome"]):r["count"] for r in previous_details["attacks"]}
+                new_attacks = {(r["kind"],r["spellId"],r["hand"],r["outcome"]):r["count"] for r in details["attacks"]}
+                if any(new_attacks.get(k,0)<v for k,v in old_attacks.items()) or details["targets"]<previous_details["targets"]:
+                    raise HTTPException(409, "Combat counters decreased")
             old_rows = {row["spellId"]: row for row in before["rows"]}
             new_rows = {row["spellId"]: row for row in value["rows"]}
             if (
@@ -528,6 +541,9 @@ def stats():
     }
 
 
+from .analysis import router as analysis_router
+app.include_router(analysis_router)
+
 ROOT = Path(__file__).resolve().parents[1] / "web"
 app.mount(
     "/assets", StaticFiles(directory=ROOT / "assets", check_dir=False), name="assets"
@@ -541,6 +557,6 @@ def index():
 
 @app.get("/{page}.html")
 def portal_page(page: str):
-    if page not in {"compare", "quality", "downloads", "account", "imprint", "privacy"}:
+    if page not in {"analysis", "compare", "quality", "downloads", "account", "imprint", "privacy"}:
         raise HTTPException(404, "Page not found")
     return FileResponse(ROOT / (page + ".html"))
