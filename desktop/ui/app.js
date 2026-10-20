@@ -197,6 +197,15 @@ function renderProgress(s) {
         : text("Next check shortly…", "Nächste Prüfung folgt gleich …");
   }
 }
+function renderCredential(s) {
+  $("credential").textContent = s.keyringLoading
+    ? text("Loading saved token…", "Gespeicherter Token wird geladen …")
+    : s.hasToken
+      ? s.persistentToken
+        ? text("Saved in keyring", "Im Schlüsselbund gespeichert")
+        : text("Session only", "Nur diese Sitzung")
+      : text("No token", "Kein Token");
+}
 async function overview() {
   const s = await invoke("overview");
   renderProgress(s);
@@ -213,15 +222,19 @@ async function overview() {
   $("auto").checked = s.autoUpload;
   $("interval").value = String(s.uploadIntervalMinutes || 15);
   $("bandwidth").value = String(s.uploadBandwidthKib || 0);
-  $("credential").textContent = s.hasToken
-    ? s.persistentToken
-      ? text("Saved in keyring", "Im Schlüsselbund gespeichert")
-      : text("Session only", "Nur diese Sitzung")
-    : text("No token", "Kein Token");
+  renderCredential(s);
   return s;
 }
+let scanGeneration = 0;
 async function scan() {
+  const generation = ++scanGeneration;
+  if (!$("characters").children.length)
+    $("characters").textContent = text(
+      "Finding characters…",
+      "Charaktere werden gesucht …",
+    );
   const rows = await invoke("discover");
+  if (generation !== scanGeneration) return;
   $("characters").replaceChildren();
   const groups = new Map();
   for (const row of rows) {
@@ -464,6 +477,7 @@ setInterval(
     run(async () => {
       const s = await invoke("overview");
       renderProgress(s);
+      renderCredential(s);
       if (s.status && !s.busy) status(s.status);
     }),
   1000,

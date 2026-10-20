@@ -4,14 +4,27 @@ This is an unreleased development build. No GitHub release workflow is needed.
 Run `bash tools/build-local-appimage.sh` with local Podman. All build caches are
 host directories below the ignored `desktop/target/local-build/` directory.
 The container uses Ubuntu 22.04; cross-distribution runtime validation is still
-required. This debug AppImage is approximately 134 MiB, not a release-size target.
+required. The optimized dev.4 AppImage is approximately 79 MiB (the previous
+debug build was approximately 134 MiB).
 
 The build has a separate application identifier and keyring entry. It does not
 register/replace the normal desktop launcher. Update buttons are disabled so it
 cannot replace itself with the production release. It defaults to the local API
-`http://127.0.0.1:8771/api`. Debug builds alone may override this with
+`http://127.0.0.1:8771/api`. Debug builds and builds with the explicit `local-test`
+feature may override this with
 `GABBAPROC_TEST_API=http://127.0.0.1:PORT/api`; arbitrary remote hosts are rejected.
-Release builds always use the production HTTPS endpoint.
+Release builds without `local-test` use the production HTTPS endpoint.
+
+Development build dev.4 loads saved credentials in the background and searches
+for characters outside the UI thread. Loading feedback remains visible while
+these operations run. Existing development preferences and queued uploads are
+preserved. For timing diagnostics, set `GABBAPROC_STARTUP_TRACE=1`; stderr then
+contains elapsed milliseconds for startup phases, without tokens or file paths.
+On the development workstation, one warm launch with
+`APPIMAGE_EXTRACT_AND_RUN=1` reached the page-loaded event in 524 ms from launcher
+invocation (175 ms inside the application). This is a local measurement, not a
+cold-start or cross-platform guarantee. Browser checks also cover a deliberately
+delayed scan and credential load while other controls remain usable.
 
 Start an isolated PostgreSQL test API and worker using the development server
 code before trying uploads. Use a test token and a copy of SavedVariables, not

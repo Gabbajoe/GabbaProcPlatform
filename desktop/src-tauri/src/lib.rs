@@ -36,6 +36,7 @@ struct Inner {
     config: Config,
     token: Option<String>,
     persistent: bool,
+    keyring_loading: bool,
     busy: bool,
     last_auto_attempt: Option<Instant>,
     last_queue_attempt: Option<Instant>,
@@ -43,6 +44,7 @@ struct Inner {
     status: String,
     progress: BTreeMap<String, Value>,
     files: BTreeMap<String, PathBuf>,
+    discovery_generation: u64,
     config_file: PathBuf,
 }
 #[derive(Clone)]
@@ -50,7 +52,7 @@ struct AppState(Arc<Mutex<Inner>>);
 struct RestartTarget(Mutex<Option<PathBuf>>);
 fn key() -> Result<keyring::Entry> {
     keyring::Entry::new(
-        if cfg!(debug_assertions) {
+        if cfg!(any(debug_assertions, feature = "local-test")) {
             "info.kellerkind.gabbaproc.dev"
         } else {
             "info.kellerkind.gabbaproc"
@@ -72,7 +74,7 @@ fn save(s: &Inner) -> Result<()> {
     fs::rename(temp, &s.config_file).map_err(|_| "Cannot replace preferences".into())
 }
 fn api_base() -> String {
-    #[cfg(debug_assertions)]
+    #[cfg(any(debug_assertions, feature = "local-test"))]
     if let Ok(value) = std::env::var("GABBAPROC_TEST_API") {
         if let Ok(url) = reqwest::Url::parse(&value) {
             if url.scheme() == "http" && url.host_str() == Some("127.0.0.1") && url.path() == "/api"
@@ -81,7 +83,7 @@ fn api_base() -> String {
             }
         }
     }
-    if cfg!(debug_assertions) {
+    if cfg!(any(debug_assertions, feature = "local-test")) {
         "http://127.0.0.1:8771/api".to_string()
     } else {
         API.to_string()
@@ -122,18 +124,32 @@ fn response(r: std::result::Result<reqwest::blocking::Response, reqwest::Error>)
 #[tauri::command]
 fn overview(state: State<AppState>, app: tauri::AppHandle) -> Value {
     let s = state.0.lock().unwrap();
-    json!({"version":app.package_info().version.to_string(),"localBuild":cfg!(debug_assertions),"autoUpload":s.config.auto_upload,"uploadIntervalMinutes":s.config.upload_interval_minutes,"uploadBandwidthKib":s.config.upload_bandwidth_kib,"hasToken":s.token.is_some(),"persistentToken":s.persistent,"busy":s.busy,"status":s.status,"progress":s.progress,"finishingUpload":s.manual_drain})
+    json!({"version":app.package_info().version.to_string(),"localBuild":cfg!(any(debug_assertions, feature = "local-test")),"autoUpload":s.config.auto_upload,"uploadIntervalMinutes":s.config.upload_interval_minutes,"uploadBandwidthKib":s.config.upload_bandwidth_kib,"hasToken":s.token.is_some(),"persistentToken":s.persistent,"keyringLoading":s.keyring_loading,"busy":s.busy,"status":s.status,"progress":s.progress,"finishingUpload":s.manual_drain})
 }
 #[tauri::command]
-fn discover(state: State<AppState>) -> Result<Value> {
+async fn discover(state: State<'_, AppState>) -> Result<Value> {
+    let state = state.inner().clone();
+    let generation = {
+        let mut inner = state.0.lock().unwrap();
+        inner.discovery_generation += 1;
+        inner.discovery_generation
+    };
+    tauri::async_runtime::spawn_blocking(move || discover_inner(&state, generation))
+        .await
+        .map_err(|_| "Character discovery failed")?
+}
+fn discover_inner(state: &AppState, generation: u64) -> Result<Value> {
     let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
         .map(PathBuf::from)
         .ok_or("Home directory unavailable")?;
     let mut roots = gabbaproc_core::roots(&home);
-    let mut s = state.0.lock().unwrap();
-    roots.extend(s.config.roots.clone());
+    let (extra_roots, choices) = {
+        let s = state.0.lock().unwrap();
+        (s.config.roots.clone(), s.config.choices.clone())
+    };
+    roots.extend(extra_roots);
     let paths = gabbaproc_core::discover(&roots);
-    s.files.clear();
+    let mut files = BTreeMap::new();
     let mut out = Vec::new();
     for path in paths {
         let mut row = gabbaproc_core::source_labels(&path);
@@ -141,15 +157,14 @@ fn discover(state: State<AppState>) -> Result<Value> {
             Ok(raw) => match gabbaproc_core::payload(&raw, false) {
                 Ok(payload) => {
                     let id = payload["characterId"].as_str().unwrap().to_string();
-                    if s.files.contains_key(&id) {
+                    if files.contains_key(&id) {
                         row["error"] = json!("duplicate");
                     } else {
                         row["id"] = json!(id);
-                        row["choice"] =
-                            json!(s.config.choices.get(&id).cloned().unwrap_or_default());
+                        row["choice"] = json!(choices.get(&id).cloned().unwrap_or_default());
                         row["sequence"] = payload["sequence"].clone();
                         row["rows"] = json!(payload["totals"].as_array().map_or(0, |a| a.len()));
-                        s.files.insert(id, path);
+                        files.insert(id, path);
                     }
                 }
                 Err(_) => {
@@ -163,6 +178,10 @@ fn discover(state: State<AppState>) -> Result<Value> {
             Err(_) => row["error"] = json!("unreadable_export"),
         }
         out.push(row);
+    }
+    let mut inner = state.0.lock().unwrap();
+    if inner.discovery_generation == generation {
+        inner.files = files;
     }
     Ok(json!(out))
 }
@@ -319,6 +338,7 @@ fn set_token(token: String, state: State<AppState>) -> Result<bool> {
     s.persistent = key()
         .and_then(|k| k.set_password(&token).map_err(|_| "Keyring locked".into()))
         .is_ok();
+    s.keyring_loading = false;
     s.config.token_digest = Some(format!("{:x}", Sha256::digest(token.as_bytes())));
     s.token = Some(token);
     s.config.acks.clear();
@@ -738,8 +758,18 @@ fn register_linux_desktop_for(
     Ok(())
 }
 
+fn startup_trace(started: Instant, phase: &str) {
+    if std::env::var_os("GABBAPROC_STARTUP_TRACE").is_some() {
+        eprintln!("startup {phase}: {} ms", started.elapsed().as_millis());
+    }
+}
 pub fn run() {
-    #[cfg(all(target_os = "linux", not(debug_assertions)))]
+    let started = Instant::now();
+    startup_trace(started, "process");
+    #[cfg(all(
+        target_os = "linux",
+        not(any(debug_assertions, feature = "local-test"))
+    ))]
     {
         let executable = std::env::var_os("APPIMAGE")
             .map(PathBuf::from)
@@ -755,7 +785,13 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::Builder::new().build())
-        .setup(|app| {
+        .on_page_load(move |_, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                startup_trace(started, "page_loaded");
+            }
+        })
+        .setup(move |app| {
+            startup_trace(started, "setup");
             let dir = app.path().app_config_dir()?;
             fs::create_dir_all(&dir)?;
             #[cfg(unix)]
@@ -774,14 +810,12 @@ pub fn run() {
             if ![0, 64, 128, 256, 512, 1024].contains(&config.upload_bandwidth_kib) {
                 config.upload_bandwidth_kib = 0;
             }
-            let token = key().ok().and_then(|k| k.get_password().ok()).filter(|t| {
-                config.token_digest.as_deref()
-                    == Some(&format!("{:x}", Sha256::digest(t.as_bytes())))
-            });
+            let expected_digest = config.token_digest.clone();
             let state = AppState(Arc::new(Mutex::new(Inner {
                 config,
-                persistent: token.is_some(),
-                token,
+                persistent: false,
+                keyring_loading: expected_digest.is_some(),
+                token: None,
                 busy: false,
                 last_auto_attempt: Some(Instant::now()),
                 last_queue_attempt: None,
@@ -789,9 +823,32 @@ pub fn run() {
                 status: String::new(),
                 progress: BTreeMap::new(),
                 files: BTreeMap::new(),
+                discovery_generation: 0,
                 config_file: file,
             })));
             app.manage(state.clone());
+            if let Some(expected) = expected_digest {
+                let credentials = state.clone();
+                std::thread::spawn(move || {
+                    let token = key()
+                        .ok()
+                        .and_then(|k| k.get_password().ok())
+                        .filter(|value| {
+                            format!("{:x}", Sha256::digest(value.as_bytes())) == expected
+                        });
+                    let mut inner = credentials.0.lock().unwrap();
+                    // Do not overwrite a token edited or revoked while loading.
+                    if inner.config.token_digest.as_deref() == Some(&expected)
+                        && inner.token.is_none()
+                    {
+                        inner.persistent = token.is_some();
+                        inner.token = token;
+                    }
+                    inner.keyring_loading = false;
+                    startup_trace(started, "keyring_finished");
+                });
+            }
+
             if let Some(icon) = app.default_window_icon() {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.set_icon(icon.clone());
@@ -815,6 +872,7 @@ pub fn run() {
                 std::thread::sleep(Duration::from_secs(5));
                 let _ = sync_inner(&state, true);
             });
+            startup_trace(started, "setup_finished");
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -928,6 +986,7 @@ mod transport_tests {
             config,
             token: Some(token.into()),
             persistent: false,
+            keyring_loading: false,
             busy: false,
             last_auto_attempt: None,
             last_queue_attempt: None,
@@ -935,6 +994,7 @@ mod transport_tests {
             status: String::new(),
             progress: BTreeMap::new(),
             files: BTreeMap::new(),
+            discovery_generation: 0,
             config_file: dir.join("preferences.json"),
         })));
         let queue_path = outbox_path(&state.0.lock().unwrap(), token, id);

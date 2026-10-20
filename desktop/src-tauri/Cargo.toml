@@ -3,6 +3,8 @@ name = "gabbaproc-companion"
 version = "0.1.1"
 edition = "2021"
 license = "MIT"
+[features]
+local-test = []
 [lib]
 name = "gabbaproc_companion"
 crate-type = ["staticlib", "cdylib", "rlib"]

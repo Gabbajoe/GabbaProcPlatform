@@ -39,7 +39,7 @@ apply to serial manual and automatic uploads; unlimited remains the default.
 Validation: 25 PostgreSQL tests pass, including a >8 MiB Lua SavedVariables file
 processed by the real Rust parser into 19 packets and 1,702 stored fights across
 two collections. Thirteen core Rust tests and a native HTTP transport test pass.
-The local debug AppImage starts on the workstation. See
+The local AppImage uses an optimized build with the explicit `local-test` feature. See
 [local companion test instructions](LOCAL-COMPANION-TEST.md). No release pipeline
 was started for this work and the production deployment remains unchanged.
 
