@@ -1004,7 +1004,7 @@ dependencies = [
 
 [[package]]
 name = "gabbaproc-companion"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gabbaproc-core",
  "keyring",
@@ -1022,7 +1022,7 @@ dependencies = [
 
 [[package]]
 name = "gabbaproc-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
