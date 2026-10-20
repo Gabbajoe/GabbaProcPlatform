@@ -6,7 +6,7 @@
 
 Community proc research for WoW Classic Era / Hardcore. Website, API and lightweight Tauri companion, openly maintained in one repository.
 
-**[Website](https://gabbaproc.kellerkind.info) · [Companion releases](https://github.com/Gabbajoe/GabbaProcPlatform/releases) · [Addon](https://github.com/Gabbajoe/GabbaProcTracker)**
+**[Website](https://gabbaproc.kellerkind.info) · [Companion releases](https://github.com/Gabbajoe/GabbaProcPlatform/releases) · [Addon on CurseForge](https://www.curseforge.com/wow/addons/gabbaproctracker) · [Addon source](https://github.com/Gabbajoe/GabbaProcTracker)**
 
 ## How it works
 
@@ -34,7 +34,9 @@ Automatic updates support all three formats. Updating a system-installed RPM or 
 
 Rates are **combat procs / eligible combat minutes**, aggregated by exposure, not the mean of character rates. They are not proc probabilities per hit. Attack speed, targets, class and equipment remain confounders. Locally editable data cannot be authenticated as genuine gameplay. The site labels it community data; extreme rates are quarantined for review.
 
-The server stores the newest cumulative snapshot for each character/collection and its rolling window of at most 301 combat segments. Re-importing does not add counts twice. Unknown/custom effects are omitted. UUIDs are pseudonyms, not authentication credentials.
+The PostgreSQL server keeps the newest cumulative snapshot per character/collection and retains all completed combat segments it receives. Upload packets are bounded, but a later packet does not replace previously received history. Older addon versions provide only their rolling window; fights never exported or uploaded cannot be reconstructed. Re-importing does not add counts twice. Unknown/custom effects are omitted. UUIDs are pseudonyms, not authentication credentials.
+
+The companion saves pending archive packets locally until the server confirms processing. Separate bars show received and processed packets. Tabs separate character selection, synchronization, account access and settings; optional bandwidth limits apply to uploads.
 
 ## Privacy and deletion
 
@@ -54,6 +56,8 @@ cargo test --locked -p gabbaproc-core
 npm ci
 npm run tauri dev
 ```
+
+The desktop archive queue requires the PostgreSQL API and worker; the simple server command above is for API/UI development. See [local companion testing](LOCAL-COMPANION-TEST.md) and [production operations](deploy/PRODUCTION.md) for complete setups.
 
 Native app builds require Tauri's OS development dependencies (WebKitGTK 4.1/GTK 3 on Linux, Xcode tools on macOS, MSVC/WebView2 on Windows). `cargo test -p gabbaproc-core` does not require a GUI toolkit.
 

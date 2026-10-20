@@ -40,7 +40,9 @@ docker exec gabbaproc-v2-api-1 python -c 'from server.storage import invite; pri
 ```
 
 Treat that output as a secret. Five requested invitations were delivered only in
-a private local file; none are included here. Activation is on `/account.html`.
+a private local file; none are included here. Those five invitations were explicitly
+extended through 2026-10-31 23:59:59 Europe/Berlin and remain single-use.
+Activation is on `/account.html`.
 The operator CLI's initialization step should run only with migration credentials.
 
 Desktop 0.1.2 must be published only after all platform artifacts and updater

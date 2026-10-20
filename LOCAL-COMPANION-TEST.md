@@ -28,7 +28,8 @@ delayed scan and credential load while other controls remain usable.
 
 Start an isolated PostgreSQL test API and worker using the development server
 code before trying uploads. Use a test token and a copy of SavedVariables, not
-production credentials. The live website does not yet run this queue protocol.
+production credentials. The live website now supports this queue protocol, but local builds and test
+tokens remain separate from production.
 
 ## Archive transport
 
