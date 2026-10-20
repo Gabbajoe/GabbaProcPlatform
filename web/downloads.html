@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Community proc measurements for WoW Classic Era and Hardcore. Compare observed effects across Open World, dungeons and raids."
+    />
+    <title>GabbaProc · Addon &amp; companion</title>
+    <link rel="icon" href="/assets/logo.png" />
+    <link rel="stylesheet" href="/assets/site.css" />
+    <script src="/assets/site.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="masthead">
+      <a class="brand" href="/"
+        ><img src="/assets/logo.png" alt="" width="36" height="36" /><b
+          >Gabba<span>Proc</span></b
+        ></a
+      ><span class="edition">CLASSIC ERA / HARDCORE</span
+      ><button id="language" type="button" aria-label="Switch language">
+        DE
+      </button>
+    </header>
+    <div class="layout">
+      <aside>
+        <nav aria-label="Main">
+          <a href="/"
+            ><span data-en="Observations" data-de="Messwerte"
+              >Observations</span
+            ></a
+          ><a href="/compare.html"
+            ><span data-en="Compare effects" data-de="Effekte vergleichen"
+              >Compare effects</span
+            ></a
+          ><a href="/quality.html"
+            ><span
+              data-en="Method &amp; data quality"
+              data-de="Methodik &amp; Datenqualität"
+              >Method &amp; data quality</span
+            ></a
+          ><a href="/downloads.html" aria-current="page"
+            ><span
+              data-en="Addon &amp; companion"
+              data-de="Addon &amp; Companion"
+              >Addon &amp; companion</span
+            ></a
+          ><a href="/account.html"
+            ><span data-en="My account" data-de="Mein Konto"
+              >My account</span
+            ></a
+          >
+        </nav>
+        <div class="side-note">
+          <strong
+            data-en="Community measurements"
+            data-de="Messwerte der Community"
+            >Community measurements</strong
+          >
+          <p data-en="Open source · EN / DE" data-de="Open Source · DE / EN">
+            Open source · EN / DE
+          </p>
+          <a href="https://github.com/Gabbajoe/GabbaProcPlatform">GitHub ↗</a>
+        </div>
+      </aside>
+      <main id="main">
+        <div class="page-heading">
+          <h1 data-en="Addon &amp; companion" data-de="Addon &amp; Companion">
+            Addon &amp; companion
+          </h1>
+          <p
+            data-en="Collect in WoW. Review and share from your desktop."
+            data-de="In WoW sammeln. Auf dem Desktop prüfen und teilen."
+          >
+            Collect in WoW. Review and share from your desktop.
+          </p>
+        </div>
+        <div class="download-grid">
+          <section class="panel">
+            <h2>GabbaProcTracker</h2>
+            <p
+              data-en="Install the addon in your Classic Era / Hardcore installation. A fresh snapshot is written when you reload or log out."
+              data-de="Installiere das Addon in deiner Classic-Era-/Hardcore-Installation. Ein aktueller Snapshot wird bei Reload oder Logout geschrieben."
+            >
+              Install the addon in your Classic Era / Hardcore installation. A
+              fresh snapshot is written when you reload or log out.
+            </p>
+            <a
+              class="button"
+              href="https://github.com/Gabbajoe/GabbaProcTracker/releases"
+              >Releases ↗</a
+            >
+            <a href="https://github.com/Gabbajoe/GabbaProcTracker">GitHub ↗</a>
+          </section>
+          <section class="panel">
+            <h2>GabbaProc Companion</h2>
+            <p
+              data-en="Choose characters, review the payload and upload manually or automatically. Downloads and updates are hosted on GitHub."
+              data-de="Charaktere auswählen, Nutzlast prüfen und manuell oder automatisch hochladen. Downloads und Updates liegen auf GitHub."
+            >
+              Choose characters, review the payload and upload manually or
+              automatically. Downloads and updates are hosted on GitHub.
+            </p>
+            <a
+              class="button"
+              href="https://github.com/Gabbajoe/GabbaProcPlatform/releases/latest"
+              ><span data-en="Latest release ↗" data-de="Aktuelles Release ↗"
+                >Latest release ↗</span
+              ></a
+            >
+          </section>
+        </div>
+        <section class="panel">
+          <h2>
+            <span data-en="Choose your package" data-de="Passendes Paket wählen"
+              >Choose your package</span
+            >
+          </h2>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>System</th>
+                  <th>
+                    <span data-en="Package" data-de="Paket">Package</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Windows x64</td>
+                  <td><code>x64-setup.exe</code></td>
+                </tr>
+                <tr>
+                  <td>macOS Apple Silicon</td>
+                  <td><code>aarch64.dmg</code></td>
+                </tr>
+                <tr>
+                  <td>macOS Intel</td>
+                  <td><code>x64.dmg</code></td>
+                </tr>
+                <tr>
+                  <td>Fedora x64</td>
+                  <td><code>x86_64.rpm</code></td>
+                </tr>
+                <tr>
+                  <td>Debian / Ubuntu x64</td>
+                  <td><code>amd64.deb</code></td>
+                </tr>
+                <tr>
+                  <td>Linux x64 portable</td>
+                  <td><code>amd64.AppImage</code></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p
+            data-en="Windows and macOS packages do not yet have a trusted publisher signature or Apple notarization. Cryptographic updater signatures are separate. Check the release notes for compatibility and test coverage."
+            data-de="Windows- und macOS-Pakete haben noch keine vertrauenswürdige Herausgebersignatur bzw. Apple-Notarisierung. Kryptografische Update-Signaturen sind davon getrennt. Kompatibilität und Testumfang stehen in den Release-Notes."
+            class="caption"
+          >
+            Windows and macOS packages do not yet have a trusted publisher
+            signature or Apple notarization. Cryptographic updater signatures
+            are separate. Check the release notes for compatibility and test
+            coverage.
+          </p>
+        </section>
+      </main>
+    </div>
+    <footer>
+      <span>GabbaProc</span
+      ><a href="/quality.html"
+        ><span data-en="Data &amp; privacy" data-de="Daten &amp; Datenschutz"
+          >Data &amp; privacy</span
+        ></a
+      ><a href="mailto:gabbaproc@kellerkind.info">Kontakt</a
+      ><a href="https://nilskeller.de/seiten/Impressum.html"
+        ><span data-en="Legal notice" data-de="Impressum">Legal notice</span></a
+      >
+    </footer>
+  </body>
+</html>

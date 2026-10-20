@@ -3,294 +3,227 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>GabbaProc · Community proc observatory</title>
     <meta
       name="description"
-      content="Compare community proc observations from WoW Classic Era and Hardcore. Open source, transparent uploads, English and German."
+      content="Community proc measurements for WoW Classic Era and Hardcore. Compare observed effects across Open World, dungeons and raids."
     />
+    <title>GabbaProc · Proc observations</title>
     <link rel="icon" href="/assets/logo.png" />
     <link rel="stylesheet" href="/assets/site.css" />
     <script src="/assets/site.js" defer></script>
   </head>
   <body>
-    <header>
-      <a class="brand" href="#"
-        ><img src="/assets/logo.png" alt="" /><span
-          >GABBA<span class="gold">PROC</span
-          ><small data-i="observatory">COMMUNITY OBSERVATORY</small></span
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="masthead">
+      <a class="brand" href="/"
+        ><img src="/assets/logo.png" alt="" width="36" height="36" /><b
+          >Gabba<span>Proc</span></b
         ></a
-      >
-      <nav>
-        <a href="#data" data-i="explore">Explore data</a
-        ><a href="#contribute" data-i="contribute">Contribute</a
-        ><a href="#transparency" data-i="transparency">Transparency</a
-        ><button id="language" aria-label="Switch language">DE</button>
-      </nav>
+      ><span class="edition">CLASSIC ERA / HARDCORE</span
+      ><button id="language" type="button" aria-label="Switch language">
+        DE
+      </button>
     </header>
-    <main>
-      <section class="hero">
-        <div>
-          <p class="eyebrow" data-i="era">
-            CLASSIC ERA / HARDCORE · OPEN COMMUNITY DATA
+    <div class="layout">
+      <aside>
+        <nav aria-label="Main">
+          <a href="/" aria-current="page"
+            ><span data-en="Observations" data-de="Messwerte"
+              >Observations</span
+            ></a
+          ><a href="/compare.html"
+            ><span data-en="Compare effects" data-de="Effekte vergleichen"
+              >Compare effects</span
+            ></a
+          ><a href="/quality.html"
+            ><span
+              data-en="Method &amp; data quality"
+              data-de="Methodik &amp; Datenqualität"
+              >Method &amp; data quality</span
+            ></a
+          ><a href="/downloads.html"
+            ><span
+              data-en="Addon &amp; companion"
+              data-de="Addon &amp; Companion"
+              >Addon &amp; companion</span
+            ></a
+          ><a href="/account.html"
+            ><span data-en="My account" data-de="Mein Konto"
+              >My account</span
+            ></a
+          >
+        </nav>
+        <div class="side-note">
+          <strong
+            data-en="Community measurements"
+            data-de="Messwerte der Community"
+            >Community measurements</strong
+          >
+          <p data-en="Open source · EN / DE" data-de="Open Source · DE / EN">
+            Open source · EN / DE
           </p>
-          <h1 data-i="hero">Every proc.<br />Part of a bigger picture.</h1>
-          <p class="intro" data-i="intro">
-            Collect your observations. Compare Open World, dungeons and raids.
-            Help build a dataset we can all inspect.
-          </p>
-          <div class="actions">
-            <a class="button primary" href="#data" data-i="explore"
-              >Explore data</a
-            ><a class="button" href="#contribute" data-i="join"
-              >Add your observations ↗</a
-            >
-          </div>
-          <p class="quiet" data-i="disclaimer">
-            Community observations — not verified combat logs or proof of
-            different proc chances.
+          <a href="https://github.com/Gabbajoe/GabbaProcPlatform">GitHub ↗</a>
+        </div>
+      </aside>
+      <main id="main">
+        <div class="page-heading">
+          <h1 data-en="Proc observations" data-de="Proc-Messwerte">
+            Proc observations
+          </h1>
+          <p
+            data-en="Weapons, enchants, trinkets and talents. Explore the measurements behind each rate."
+            data-de="Waffen, Verzauberungen, Trinkets und Talente. Vergleiche die Messwerte hinter jeder Rate."
+          >
+            Weapons, enchants, trinkets and talents. Explore the measurements
+            behind each rate.
           </p>
         </div>
-        <img
-          class="hero-icon"
-          src="/assets/logo.png"
-          alt="Golden medallion with a turquoise lightning bolt and statistics bars"
-        />
-      </section>
-      <section class="metrics" aria-label="Dataset summary">
-        <article>
-          <span data-i="contributors">Contributors</span
-          ><strong id="contributors">—</strong>
-        </article>
-        <article>
-          <span data-i="collections">Measurement collections</span
-          ><strong id="collections">—</strong>
-        </article>
-        <article>
-          <span data-i="effects">Observed effects</span
-          ><strong id="effects">—</strong>
-        </article>
-        <article>
-          <span data-i="updated">Last received</span
-          ><strong id="updated" class="small">—</strong>
-        </article>
-      </section>
-      <section id="data">
-        <div class="section-title">
+        <section class="metrics" aria-label="Dataset summary">
           <div>
-            <p class="eyebrow" data-i="dataset">THE DATASET</p>
-            <h2 data-i="compare">Compare the observations</h2>
+            <span data-en="Contributors" data-de="Beitragende"
+              >Contributors</span
+            ><strong id="contributors">—</strong>
           </div>
-          <button id="refresh" data-i="refresh">Refresh</button>
-        </div>
-        <div class="filters">
-          <label
-            ><span data-i="search">Effect name or spell ID</span
-            ><input
-              id="search"
-              type="search"
-              placeholder="Crusader, Ironfoe, 20007…" /></label
-          ><label
-            ><span data-i="area">Area</span
-            ><select id="area">
-              <option value="all" data-i="all">All areas</option>
-              <option value="world">Open World</option>
-              <option value="party" data-i="dungeons">Dungeons</option>
-              <option value="raid" data-i="raids">Raids</option>
-            </select></label
-          ><label
-            ><span data-i="minimum">Minimum combat minutes</span
-            ><input
-              id="minimum"
-              type="number"
-              min="0"
-              value="0"
-              step="1" /></label
-          ><button id="csv" data-i="csv">Export visible CSV</button>
-        </div>
-        <p id="status" role="status" aria-live="polite"></p>
-        <div class="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th data-i="effect">Effect</th>
-                <th data-i="area">Area</th>
-                <th data-i="procs">Total procs</th>
-                <th data-i="combat">Combat minutes</th>
-                <th data-i="rate">Procs / combat minute</th>
-                <th data-i="contributors">Contributors</th>
-              </tr>
-            </thead>
-            <tbody id="rows"></tbody>
-          </table>
-        </div>
-        <p class="quiet" data-i="weighted">
-          Rates use total combat procs ÷ total combat time. Zero-proc fights
-          count. Exposure can overlap across effects; it is not unique playtime.
-        </p>
-        <div class="notice">
-          <strong data-i="interpretTitle"
-            >A higher bar is an observation, not a verdict.</strong
-          >
-          <p data-i="interpret">
-            Attack speed, targets, equipment and ability choices influence
-            rates. This version does not count eligible hits, estimate proc
-            probability or calculate confidence intervals. Extreme rates are
-            quarantined, but plausible fabricated numbers cannot be reliably
-            detected.
-          </p>
-        </div>
-      </section>
-      <section id="contribute">
-        <p class="eyebrow" data-i="contribute">CONTRIBUTE</p>
-        <h2 data-i="joinTitle">Your next proc can help.</h2>
-        <div class="cards">
-          <article>
-            <span class="step">01</span>
-            <h3 data-i="install">Install the addon</h3>
-            <p data-i="installText">
-              GabbaProcTracker records your own effects. The companion reads
-              only the saved export after a reload or logout.
-            </p>
-            <a
-              href="https://github.com/Gabbajoe/GabbaProcTracker/releases"
-              rel="noopener"
-              data-i="addon"
-              >Get the addon ↗</a
-            >
-          </article>
-          <article>
-            <span class="step">02</span>
-            <h3 data-i="companion">Connect the companion</h3>
-            <p data-i="companionText">
-              Find WoW automatically, choose characters and enable uploads. App
-              packages and signed updates are hosted on GitHub.
-            </p>
-            <a
-              href="https://github.com/Gabbajoe/GabbaProcPlatform/releases"
-              rel="noopener"
-              data-i="app"
-              >Companion downloads ↗</a
-            >
-          </article>
-          <article>
-            <span class="step">03</span>
-            <h3 data-i="choice">Choose what you share</h3>
-            <p data-i="choiceText">
-              Without names is the default. You can explicitly share your
-              character name and realm. Uploading is optional and can be paused.
-            </p>
-            <a href="#transparency" data-i="details"
-              >See the exact data policy ↓</a
-            >
-          </article>
-        </div>
-        <div class="enrollment">
-          <h3 data-i="pilot">Join the initial data collection</h3>
-          <p data-i="pilotText">
-            The first version uses single-use operator invitations to limit
-            abuse. Enter your invitation to receive an upload token. Paste it
-            into the companion; never post it publicly.
-          </p>
-          <form id="enroll">
+          <div>
+            <span data-en="Collections" data-de="Messreihen">Collections</span
+            ><strong id="collections">—</strong>
+          </div>
+          <div>
+            <span data-en="Observed effects" data-de="Erfasste Effekte"
+              >Observed effects</span
+            ><strong id="effects">—</strong>
+          </div>
+          <div>
+            <span data-en="Last upload" data-de="Letzter Upload"
+              >Last upload</span
+            ><strong id="updated">—</strong>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="filters">
             <label
-              ><span data-i="invitation">Invitation</span
+              ><span data-en="Effect / spell ID" data-de="Effekt / Zauber-ID"
+                >Effect / spell ID</span
               ><input
-                id="invite"
-                type="password"
-                autocomplete="off"
-                maxlength="100"
-                required /></label
-            ><button class="primary" data-i="activate">
-              Activate invitation
-            </button>
-          </form>
-          <p id="enroll-status" role="status"></p>
-          <label id="token-box" hidden
-            ><span data-i="token">Your upload token — shown once</span
-            ><input id="token" type="text" readonly autocomplete="off" /><button
-              id="copy-token"
-              type="button"
-              data-i="copy"
+                id="search"
+                type="search"
+                placeholder="Crusader, Ironfoe, 20007…" /></label
+            ><label
+              ><span data-en="Area" data-de="Gebiet">Area</span
+              ><select id="area">
+                <option value="all" data-en="All areas" data-de="Alle Gebiete">
+                  All areas
+                </option>
+                <option value="world">Open World</option>
+                <option value="party" data-en="Dungeons" data-de="Dungeons">
+                  Dungeons
+                </option>
+                <option value="raid" data-en="Raids" data-de="Raids">
+                  Raids
+                </option>
+              </select></label
+            ><label
+              ><span data-en="Min. combat minutes" data-de="Min. Kampfminuten"
+                >Min. combat minutes</span
+              ><input id="minimum" type="number" min="0" value="0" /></label
+            ><label
+              ><span data-en="Sort by" data-de="Sortierung">Sort by</span
+              ><select id="sort">
+                <option value="name" data-en="Effect name" data-de="Effektname">
+                  Effect name
+                </option>
+                <option
+                  value="procs"
+                  data-en="Most procs"
+                  data-de="Meiste Procs"
+                >
+                  Most procs
+                </option>
+                <option
+                  value="seconds"
+                  data-en="Most combat time"
+                  data-de="Meiste Kampfzeit"
+                >
+                  Most combat time
+                </option>
+                <option
+                  value="ppm"
+                  data-en="Highest observed rate"
+                  data-de="Höchste beobachtete Rate"
+                >
+                  Highest observed rate
+                </option>
+              </select></label
             >
-              Copy token
-            </button></label
-          >
-        </div>
-      </section>
-      <section id="transparency">
-        <p class="eyebrow" data-i="open">OPEN SOURCE. EXPLICIT CHOICES.</p>
-        <h2 data-i="transparentTitle">
-          Know exactly what leaves your computer.
-        </h2>
-        <div class="cards">
-          <article>
-            <h3 data-i="sent">What is sent</h3>
-            <p data-i="sentText">
-              Effect IDs, area groups, counters, combat exposure, retained
-              segment data, export time and persistent collection/character
-              identifiers. Name and realm only in named mode. No account folder
-              names, local paths, chat, inventory or entire SavedVariables file.
-            </p>
-          </article>
-          <article>
-            <h3 data-i="anonymous">Without names ≠ untraceable</h3>
-            <p data-i="anonymousText">
-              Persistent identifiers make these data pseudonymous. IP addresses
-              are processed for network delivery and abuse limits. Named
-              contributions can reveal a character's identity. Removing a name
-              cannot erase copies someone already downloaded.
-            </p>
-          </article>
-          <article>
-            <h3 data-i="trust">How data are checked</h3>
-            <p data-i="trustText">
-              Lua is parsed as data, never executed. The server checks sizes,
-              known effects, counters, ownership and duplicate snapshots. Public
-              statistics include accepted community submissions, not
-              independently verified gameplay. Suspicious data are withheld.
-            </p>
-          </article>
-        </div>
-        <details>
-          <summary data-i="storage">Storage, deletion and limitations</summary>
-          <p data-i="storageText">
-            Private daily backups expire after seven days; deleted contributions
-            may remain in those backups until then. We retain the latest
-            cumulative totals and up to 301 supplied history segments per
-            collection. The public API does not expose character UUIDs, device
-            tokens or detailed timestamps. A valid device token can hide stored
-            names or delete its contributions and revoke itself. Contact the
-            operator for device transfer. History gaps remain possible.
-            Authentication tokens are stored hashed on the server. The app
-            prefers the system keychain and does not silently fall back to a
-            plaintext token file.
-          </p>
-        </details>
-        <div class="actions">
-          <a
-            class="button"
-            href="https://github.com/Gabbajoe/GabbaProcPlatform"
-            data-i="source"
-            >Read website & app source ↗</a
-          ><a
-            class="button"
-            href="https://github.com/Gabbajoe/GabbaProcPlatform/issues"
-            data-i="feedback"
-            >Questions & issues ↗</a
-          >
-        </div>
-      </section>
-      <section>
-        <h2 data-i="named">Contributors who chose to share their name</h2>
-        <div id="names" class="name-list"></div>
-      </section>
-    </main>
+          </div>
+          <div class="table-tools">
+            <p id="status" role="status" aria-live="polite"></p>
+            <div>
+              <button id="refresh">
+                <span data-en="Refresh" data-de="Aktualisieren"
+                  >Refresh</span
+                ></button
+              ><button id="csv">CSV ↓</button>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th data-en="Effect" data-de="Effekt" scope="col">Effect</th>
+                  <th data-en="Area" data-de="Gebiet" scope="col">Area</th>
+                  <th data-en="Procs" data-de="Procs" scope="col">Procs</th>
+                  <th
+                    data-en="Combat minutes"
+                    data-de="Kampfminuten"
+                    scope="col"
+                  >
+                    Combat minutes
+                  </th>
+                  <th
+                    data-en="Procs / minute"
+                    data-de="Procs / Minute"
+                    scope="col"
+                  >
+                    Procs / minute
+                  </th>
+                  <th data-en="Contributors" data-de="Beitragende" scope="col">
+                    Contributors
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+        </section>
+        <p
+          data-en="Rates are combat procs divided by eligible combat time. Zero-proc fights count. A difference between areas does not prove a different proc chance."
+          data-de="Raten sind Kampf-Procs geteilt durch geeignete Kampfzeit. Kämpfe ohne Proc zählen mit. Ein Unterschied zwischen Gebieten beweist keine andere Proc-Chance."
+          class="caption"
+        >
+          Rates are combat procs divided by eligible combat time. Zero-proc
+          fights count. A difference between areas does not prove a different
+          proc chance.
+        </p>
+        <section class="named">
+          <h2>
+            <span data-en="Named contributors" data-de="Namentliche Beiträge"
+              >Named contributors</span
+            >
+          </h2>
+          <div id="names"></div>
+        </section>
+      </main>
+    </div>
     <footer>
-      <span>GabbaProc · Community data for Classic Era / Hardcore</span
-      ><a href="https://github.com/Gabbajoe/GabbaProcPlatform/blob/main/LICENSE"
-        >MIT · Source</a
-      ><a href="https://nilskeller.de/seiten/Impressum.html" data-i="legal"
-        >Operator / legal notice</a
+      <span>GabbaProc</span
+      ><a href="/quality.html"
+        ><span data-en="Data &amp; privacy" data-de="Daten &amp; Datenschutz"
+          >Data &amp; privacy</span
+        ></a
+      ><a href="mailto:gabbaproc@kellerkind.info">Kontakt</a
+      ><a href="https://nilskeller.de/seiten/Impressum.html"
+        ><span data-en="Legal notice" data-de="Impressum">Legal notice</span></a
       >
     </footer>
   </body>

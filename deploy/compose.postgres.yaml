@@ -1,0 +1,102 @@
+# Development/staging deployment. Read POSTGRES.md before production migration.
+# Every persistent mount below is an explicit host bind; no managed volumes.
+x-app: &app
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  restart: unless-stopped
+  read_only: true
+  tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  networks: [database]
+
+services:
+  postgres:
+    image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+    restart: unless-stopped
+    shm_size: 128m
+    mem_limit: 1g
+    cpus: 1.0
+    environment:
+      POSTGRES_DB: gabbaproc
+      POSTGRES_USER: gabbaproc_admin
+      POSTGRES_PASSWORD_FILE: /run/private/postgres-password
+    volumes:
+      - type: bind
+        source: ${GABBAPROC_PG_DIR:?Host PostgreSQL directory required}
+        target: /var/lib/postgresql/data
+      - type: bind
+        source: ${GABBAPROC_CONFIG_DIR:?Private host configuration directory required}
+        target: /run/private
+        read_only: true
+      - type: bind
+        source: ./postgres-init.sh
+        target: /docker-entrypoint-initdb.d/10-app-role.sh
+        read_only: true
+    networks: [database]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U gabbaproc_admin -d gabbaproc"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    <<: *app
+    restart: "no"
+    command: [python, -m, server.migrate]
+    environment:
+      GABBAPROC_DATABASE_URL_FILE: /run/private/admin-database-url
+    volumes:
+      - type: bind
+        source: ${GABBAPROC_CONFIG_DIR}/admin-database-url
+        target: /run/private/admin-database-url
+        read_only: true
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    <<: *app
+    mem_limit: 512m
+    cpus: 1.0
+    environment: &environment
+      GABBAPROC_DATABASE_URL_FILE: /run/private/app-database-url
+      GABBAPROC_AUTO_INIT: "false"
+      GABBAPROC_SPOOL: /spool
+      GABBAPROC_DB_POOL: "8"
+      GABBAPROC_QUEUE_BYTES: "1073741824"
+      GABBAPROC_DISK_RESERVE: "536870912"
+      FORWARDED_ALLOW_IPS: ${GABBAPROC_PROXY_IP:?Trusted proxy address required}
+    volumes: &mounts
+      - type: bind
+        source: ${GABBAPROC_SPOOL_DIR:?Host spool directory required}
+        target: /spool
+      - type: bind
+        source: ${GABBAPROC_CONFIG_DIR}/app-database-url
+        target: /run/private/app-database-url
+        read_only: true
+    ports: ["127.0.0.1:${GABBAPROC_LOCAL_PORT:?Local port required}:8757"]
+    networks: [database, proxy]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  worker:
+    <<: *app
+    mem_limit: 256m
+    cpus: 0.5
+    command: [python, -m, server.worker]
+    environment:
+      <<: *environment
+      GABBAPROC_DB_POOL: "2"
+      GABBAPROC_WORKER_DELAY: "0.25"
+    volumes: *mounts
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+networks:
+  database:
+    internal: true
+  proxy:
+    external: true
+    name: ${GABBAPROC_NETWORK:?Existing private proxy network required}

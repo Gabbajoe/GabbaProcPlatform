@@ -1,4 +1,4 @@
-import copy, json, time, uuid
+import copy, json, time, uuid, os
 import pytest
 from fastapi.testclient import TestClient
 from server.app import app
@@ -8,10 +8,30 @@ from server.storage import invite, connect
 @pytest.fixture
 def api(tmp_path, monkeypatch):
     monkeypatch.setenv("GABBAPROC_DB", str(tmp_path / "db.sqlite3"))
+    monkeypatch.setenv("GABBAPROC_SPOOL", str(tmp_path / "spool"))
+    if os.environ.get("GABBAPROC_TEST_DATABASE_URL"):
+        from server.postgres import close_pool
+        from server.storage import init
+
+        close_pool()
+        monkeypatch.setenv(
+            "GABBAPROC_DATABASE_URL", os.environ["GABBAPROC_TEST_DATABASE_URL"]
+        )
+        with connect() as db:
+            assert (
+                db.execute("SELECT current_database()").fetchone()[0].endswith("_test")
+            ), "Test database name must end in _test"
+        init()
+        with connect() as db:
+            db.execute(
+                "TRUNCATE devices,invites,owners,snapshots,totals,segments,limits CASCADE"
+            )
     with TestClient(app) as c:
         token = c.post("/api/enroll", json={"invite": invite()}).json()["token"]
         c.headers["Authorization"] = "Bearer " + token
         yield c
+    if os.environ.get("GABBAPROC_TEST_DATABASE_URL"):
+        close_pool()
 
 
 @pytest.fixture
@@ -163,3 +183,129 @@ def test_visibility_change_does_not_duplicate_snapshot(api, sample):
     assert api.post("/api/imports", json=sample).json()["status"] == "duplicate"
     data = api.get("/api/stats").json()
     assert data["contributors"] == [] and data["rows"][0]["procs"] == 2
+
+
+def test_history_is_archived_and_completed_segments_are_immutable(api, sample):
+    assert api.post("/api/imports", json=sample).status_code == 200
+    sample["sequence"] = 2
+    sample["segments"][0]["id"] = 2
+    sample["totals"][0].update(procs=4, combatProcs=4, combatSeconds=240.0)
+    assert api.post("/api/imports", json=sample).status_code == 200
+    with connect() as db:
+        assert db.execute("SELECT COUNT(*) FROM segments").fetchone()[0] == 2
+    sample["sequence"] = 3
+    sample["segments"][0]["seconds"] = 121.0
+    assert api.post("/api/imports", json=sample).status_code == 409
+    with connect() as db:
+        assert db.execute("SELECT MAX(sequence) FROM snapshots").fetchone()[0] == 2
+        assert db.execute("SELECT COUNT(*) FROM segments").fetchone()[0] == 2
+
+
+def test_active_segment_can_finish_but_cannot_regress(api, sample):
+    sample["segments"][0]["status"] = "active"
+    assert api.post("/api/imports", json=sample).status_code == 200
+
+    sample["sequence"] = 2
+    sample["segments"][0]["seconds"] = 119.0
+    assert api.post("/api/imports", json=sample).status_code == 409
+    sample["segments"][0].update(seconds=120.0, status="complete")
+    assert api.post("/api/imports", json=sample).status_code == 200
+
+
+@pytest.mark.skipif(
+    not os.environ.get("GABBAPROC_TEST_DATABASE_URL"), reason="Requires real PostgreSQL"
+)
+def test_durable_queue_receipt_and_duplicate(api, sample):
+    from server.upload_queue import process_one, root
+
+    response = api.post("/api/upload-jobs", json=sample)
+    assert response.status_code == 202
+    job = response.json()
+    assert job["status"] == "queued"
+    assert api.get("/api/stats").json()["meta"]["collections"] == 0
+    assert len(list(root().glob("*.json"))) == 1
+    assert api.post("/api/upload-jobs", json=sample).json() == job
+    assert process_one()
+    status = api.get("/api/upload-jobs/" + job["jobId"]).json()
+    assert status["status"] == "processed"
+    assert status["result"]["status"] == "accepted"
+    assert not list(root().glob("*.json"))
+    assert api.post("/api/upload-jobs", json=sample).json()["status"] == "processed"
+    assert api.get("/api/stats").json()["rows"][0]["procs"] == 2
+
+
+@pytest.mark.skipif(
+    not os.environ.get("GABBAPROC_TEST_DATABASE_URL"), reason="Requires real PostgreSQL"
+)
+def test_queue_revocation_capacity_and_retry(api, sample, monkeypatch):
+    from server import upload_queue
+    from importlib import import_module
+
+    app_module = import_module("server.app")
+    monkeypatch.setenv("GABBAPROC_QUEUE_DEVICE_BYTES", "1")
+    assert api.post("/api/upload-jobs", json=sample).status_code == 429
+    assert not list(upload_queue.root().glob("*.json"))
+
+    monkeypatch.delenv("GABBAPROC_QUEUE_DEVICE_BYTES")
+    job = api.post("/api/upload-jobs", json=sample).json()["jobId"]
+    original = app_module.apply_snapshot
+
+    def fail(*args):
+        raise RuntimeError("simulated crash")
+
+    monkeypatch.setattr(app_module, "apply_snapshot", fail)
+    assert not upload_queue.process_one()
+    assert api.get("/api/upload-jobs/" + job).json()["status"] == "queued"
+    assert len(list(upload_queue.root().glob("*.json"))) == 1
+    assert api.get("/api/stats").json()["meta"]["collections"] == 0
+    monkeypatch.setattr(app_module, "apply_snapshot", original)
+    assert api.delete("/api/device").status_code == 200
+    with connect() as db:
+        assert (
+            db.execute("SELECT status FROM upload_jobs WHERE id=?", (job,)).fetchone()[
+                0
+            ]
+            == "cancelled"
+        )
+    upload_queue.cleanup()
+    assert not list(upload_queue.root().glob("*.json"))
+
+
+@pytest.mark.skipif(
+    not os.environ.get("GABBAPROC_TEST_DATABASE_URL"), reason="Requires real PostgreSQL"
+)
+def test_sqlite_migration_preserves_measurements_and_tokens(
+    api, sample, tmp_path, monkeypatch
+):
+    from server.migrate import migrate, TABLES
+    from server.storage import init
+
+    assert api.post("/api/imports", json=sample).status_code == 200
+    with connect() as db:
+        original = {
+            table: [tuple(row.values()) for row in db.execute(f"SELECT * FROM {table}")]
+            for table in TABLES
+        }
+    source = tmp_path / "migration.sqlite3"
+    with monkeypatch.context() as local:
+        local.delenv("GABBAPROC_DATABASE_URL")
+        local.setenv("GABBAPROC_DB", str(source))
+        init()
+        with connect() as db:
+            for table, rows in original.items():
+                if rows:
+                    db.executemany(
+                        f"INSERT INTO {table} VALUES({','.join('?' for _ in rows[0])})",
+                        rows,
+                    )
+    with connect() as db:
+        db.execute(
+            "TRUNCATE devices,invites,owners,snapshots,totals,segments,limits,upload_jobs CASCADE"
+        )
+    migrate(source, grant=False)
+    with connect() as db:
+        for table, rows in original.items():
+            assert [
+                tuple(row.values()) for row in db.execute(f"SELECT * FROM {table}")
+            ] == rows
+    assert api.post("/api/imports", json=sample).json()["status"] == "duplicate"

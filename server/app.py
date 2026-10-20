@@ -6,13 +6,22 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from .models import Upload, CATALOG
-from .storage import init, connect, digest
+from .storage import init, connect, digest, lock
+from starlette.concurrency import run_in_threadpool
+from . import upload_queue
+from .config import postgres_enabled
 
 
 @asynccontextmanager
 async def lifespan(app):
-    init()
+    if os.environ.get("GABBAPROC_AUTO_INIT", "true") == "true":
+        await run_in_threadpool(init)
+        await run_in_threadpool(upload_queue.initialize)
     yield
+    if postgres_enabled():
+        from .postgres import close_pool
+
+        await run_in_threadpool(close_pool)
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -73,6 +82,7 @@ def rate(key, maximum, period=3600):
     with connect() as db:
         db.execute("BEGIN IMMEDIATE")
         db.execute("DELETE FROM limits WHERE started < ?", (now - 86400,))
+        lock(db, "rate:" + key)
         old = db.execute("SELECT * FROM limits WHERE key=?", (key,)).fetchone()
         if old and now - old["started"] < period:
             if old["count"] >= maximum:
@@ -81,11 +91,14 @@ def rate(key, maximum, period=3600):
                 )
             db.execute("UPDATE limits SET count=count+1 WHERE key=?", (key,))
         else:
-            db.execute("INSERT OR REPLACE INTO limits VALUES(?,?,1)", (key, now))
+            db.execute(
+                "INSERT INTO limits VALUES(?,?,1) ON CONFLICT(key) DO UPDATE SET started=excluded.started,count=1",
+                (key, now),
+            )
         db.commit()
 
 
-def device(request):
+def device(request, maximum=120, kind="device"):
     auth = request.headers.get("authorization", "")
     if not auth.startswith("Bearer ") or not 30 < len(auth) < 150:
         raise HTTPException(401, "Upload token required")
@@ -96,7 +109,7 @@ def device(request):
         ).fetchone()
     if not row:
         raise HTTPException(401, "Upload token invalid or revoked")
-    rate("device:" + row["id"], 120)
+    rate(kind + ":" + row["id"], maximum)
     return row["id"]
 
 
@@ -109,7 +122,7 @@ def health():
 async def enroll(request: Request):
     # Invites are single-use, expire after a day, and are issued by the operator.
     # Public automated registration is deliberately not enabled without abuse controls.
-    rate("enroll:" + digest(request.client.host), 10)
+    await run_in_threadpool(rate, "enroll:" + digest(request.client.host), 10)
     data = await body(request)
     if (
         set(data) != {"invite"}
@@ -117,6 +130,10 @@ async def enroll(request: Request):
         or len(data["invite"]) > 100
     ):
         raise HTTPException(400, "Invalid invite")
+    return await run_in_threadpool(enroll_invite, data)
+
+
+def enroll_invite(data):
     token = secrets.token_urlsafe(32)
     did = secrets.token_hex(16)
     with connect() as db:
@@ -137,11 +154,39 @@ async def enroll(request: Request):
 
 @app.post("/api/imports")
 async def upload(request: Request):
-    did = device(request)
+    did = await run_in_threadpool(device, request)
     try:
         data = Upload.model_validate(await body(request))
     except (ValidationError, ValueError):
         raise HTTPException(422, "Invalid export fields, counters or history")
+    return await run_in_threadpool(import_snapshot, did, data)
+
+
+@app.post("/api/upload-jobs", status_code=202)
+async def queue_upload(request: Request):
+    did = await run_in_threadpool(device, request, 600, "uploads")
+    try:
+        data = Upload.model_validate(await body(request))
+    except (ValidationError, ValueError):
+        raise HTTPException(422, "Invalid export fields, counters or history")
+    return await run_in_threadpool(upload_queue.enqueue, did, data)
+
+
+@app.get("/api/upload-jobs/{job_id}")
+def upload_status(request: Request, job_id: str):
+    did = device(request, 3600, "job-status")
+    return upload_queue.get_status(did, job_id)
+
+
+def import_snapshot(did, data):
+    with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        result = apply_snapshot(db, did, data)
+        db.commit()
+        return result
+
+
+def apply_snapshot(db, did, data):
     if data.exportedAt > time.time() + 86400:
         raise HTTPException(422, "Export is dated in the future")
     content = json.dumps(
@@ -157,93 +202,126 @@ async def upload(request: Request):
     )
     status = "quarantine" if suspicious else "community"
     key = (data.characterId, data.collectionId)
-    with connect() as db:
-        db.execute("BEGIN IMMEDIATE")
-        owner = db.execute(
-            "SELECT * FROM owners WHERE character=?", (data.characterId,)
-        ).fetchone()
-        if owner and owner["device"] != did:
-            raise HTTPException(
-                409,
-                "Character belongs to another upload device; contact operator to transfer",
-            )
-        old = db.execute(
-            "SELECT * FROM snapshots WHERE character=? AND collection=?", key
-        ).fetchone()
-        if old and data.sequence < old["sequence"]:
-            raise HTTPException(409, "Older snapshot")
-        if old and data.sequence == old["sequence"]:
-            if old["digest"] != checksum:
-                raise HTTPException(409, "Sequence reused with different content")
+    lock(db, "device:" + did)
+    lock(db, "character:" + data.characterId)
+    active_device = db.execute(
+        "SELECT id FROM devices WHERE id=? AND revoked=0", (did,)
+    ).fetchone()
+    if not active_device:
+        raise HTTPException(401, "Upload token revoked")
+    owner = db.execute(
+        "SELECT * FROM owners WHERE character=?", (data.characterId,)
+    ).fetchone()
+    if owner and owner["device"] != did:
+        raise HTTPException(
+            409,
+            "Character belongs to another upload device; contact operator to transfer",
+        )
+    old = db.execute(
+        "SELECT * FROM snapshots WHERE character=? AND collection=?", key
+    ).fetchone()
+    if old and data.sequence < old["sequence"]:
+        raise HTTPException(409, "Older snapshot")
+    if old and data.sequence == old["sequence"]:
+        if old["digest"] != checksum:
+            raise HTTPException(409, "Sequence reused with different content")
+        db.execute(
+            "UPDATE owners SET privacy=?,name=?,realm=? WHERE character=? AND device=?",
+            (data.privacy, data.name, data.realm, data.characterId, did),
+        )
+        return {"status": "duplicate", "review": old["status"]}
+    if not old:
+        if (
             db.execute(
-                "UPDATE owners SET privacy=?,name=?,realm=? WHERE character=? AND device=?",
-                (data.privacy, data.name, data.realm, data.characterId, did),
-            )
-            db.commit()
-            return {"status": "duplicate", "review": old["status"]}
-        if not old:
+                "SELECT COUNT(*) FROM snapshots s JOIN owners o ON o.character=s.character WHERE o.device=?",
+                (did,),
+            ).fetchone()[0]
+            >= 200
+        ):
+            raise HTTPException(429, "Collection limit reached")
+    if old:
+        incoming = {(r.spellId, r.group): r for r in data.totals}
+        for previous in db.execute(
+            "SELECT * FROM totals WHERE character=? AND collection=?", key
+        ):
+            new = incoming.get((previous["spell"], previous["area"]))
             if (
-                db.execute(
-                    "SELECT COUNT(*) FROM snapshots s JOIN owners o ON o.character=s.character WHERE o.device=?",
-                    (did,),
-                ).fetchone()[0]
-                >= 200
+                not new
+                or new.procs < previous["procs"]
+                or new.combatProcs < previous["combat"]
+                or new.combatSeconds + 0.01 < previous["seconds"]
             ):
-                raise HTTPException(429, "Collection limit reached")
-        if old:
-            incoming = {(r.spellId, r.group): r for r in data.totals}
-            for previous in db.execute(
-                "SELECT * FROM totals WHERE character=? AND collection=?", key
+                raise HTTPException(409, "Counters decreased within collection")
+    db.execute(
+        "INSERT INTO owners VALUES(?,?,?,?,?) ON CONFLICT(character) DO UPDATE SET privacy=excluded.privacy,name=excluded.name,realm=excluded.realm",
+        (data.characterId, did, data.privacy, data.name, data.realm),
+    )
+    db.execute(
+        "INSERT INTO snapshots VALUES(?,?,?,?,?,?,?) ON CONFLICT(character,collection) DO UPDATE SET sequence=excluded.sequence,digest=excluded.digest,status=excluded.status,exported=excluded.exported,updated=excluded.updated",
+        (*key, data.sequence, checksum, status, data.exportedAt, int(time.time())),
+    )
+    db.execute("DELETE FROM totals WHERE character=? AND collection=?", key)
+    db.executemany(
+        "INSERT INTO totals VALUES(?,?,?,?,?,?,?)",
+        [
+            (*key, r.spellId, r.group, r.procs, r.combatProcs, r.combatSeconds)
+            for r in data.totals
+        ],
+    )
+    for segment in data.segments:
+        previous = db.execute(
+            "SELECT sequence,data FROM segments WHERE character=? AND collection=? AND id=?",
+            (*key, segment.id),
+        ).fetchone()
+        value = segment.model_dump()
+        if previous:
+            before = json.loads(previous["data"])
+            if before == value:
+                continue
+            if before["status"] == "complete":
+                raise HTTPException(409, "Completed segment changed")
+            if previous["sequence"] >= data.sequence:
+                raise HTTPException(409, "Conflicting segment revision")
+            old_rows = {row["spellId"]: row for row in before["rows"]}
+            new_rows = {row["spellId"]: row for row in value["rows"]}
+            if (
+                before["group"] != value["group"]
+                or value["seconds"] < before["seconds"]
+                or any(
+                    k not in new_rows
+                    or new_rows[k]["procs"] < v["procs"]
+                    or new_rows[k]["eligible"] != v["eligible"]
+                    for k, v in old_rows.items()
+                )
             ):
-                new = incoming.get((previous["spell"], previous["area"]))
-                if (
-                    not new
-                    or new.procs < previous["procs"]
-                    or new.combatProcs < previous["combat"]
-                    or new.combatSeconds + 0.01 < previous["seconds"]
-                ):
-                    raise HTTPException(409, "Counters decreased within collection")
+                raise HTTPException(409, "Segment counters decreased")
         db.execute(
-            "INSERT INTO owners VALUES(?,?,?,?,?) ON CONFLICT(character) DO UPDATE SET privacy=excluded.privacy,name=excluded.name,realm=excluded.realm",
-            (data.characterId, did, data.privacy, data.name, data.realm),
+            "INSERT INTO segments VALUES(?,?,?,?,?) ON CONFLICT(character,collection,id) "
+            "DO UPDATE SET sequence=excluded.sequence,data=excluded.data",
+            (*key, segment.id, data.sequence, json.dumps(value)),
         )
-        db.execute(
-            "INSERT INTO snapshots VALUES(?,?,?,?,?,?,?) ON CONFLICT(character,collection) DO UPDATE SET sequence=excluded.sequence,digest=excluded.digest,status=excluded.status,exported=excluded.exported,updated=excluded.updated",
-            (*key, data.sequence, checksum, status, data.exportedAt, int(time.time())),
-        )
-        db.execute("DELETE FROM totals WHERE character=? AND collection=?", key)
-        db.executemany(
-            "INSERT INTO totals VALUES(?,?,?,?,?,?,?)",
-            [
-                (*key, r.spellId, r.group, r.procs, r.combatProcs, r.combatSeconds)
-                for r in data.totals
-            ],
-        )
-        # Keep the supplied rolling window, not an unbounded attacker-controlled archive.
-        # Full cumulative totals remain; the web app explicitly reports this limitation.
-        db.execute("DELETE FROM segments WHERE character=? AND collection=?", key)
-        db.executemany(
-            "INSERT INTO segments VALUES(?,?,?,?,?)",
-            [
-                (*key, s.id, data.sequence, json.dumps(s.model_dump()))
-                for s in data.segments
-            ],
-        )
-        db.commit()
     return {"status": "accepted", "review": status, "sequence": data.sequence}
 
 
 @app.post("/api/privacy")
 async def privacy(request: Request):
-    did = device(request)
+    did = await run_in_threadpool(device, request)
     data = await body(request)
     if set(data) != {"characterId"} or not isinstance(data["characterId"], str):
         raise HTTPException(400, "characterId required")
+    return await run_in_threadpool(hide_character, did, data["characterId"])
+
+
+def hide_character(did, character):
     with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        lock(db, "device:" + did)
+        upload_queue.cancel_jobs(db, did, character)
         n = db.execute(
-            'UPDATE owners SET privacy="anonymous",name=NULL,realm=NULL WHERE character=? AND device=?',
-            (data["characterId"], did),
+            "UPDATE owners SET privacy='anonymous',name=NULL,realm=NULL WHERE character=? AND device=?",
+            (character, did),
         ).rowcount
+        db.commit()
     if not n:
         raise HTTPException(404, "Character not found")
     return {"status": "anonymous"}
@@ -254,6 +332,8 @@ def remove_device(request: Request):
     did = device(request)
     with connect() as db:
         db.execute("BEGIN IMMEDIATE")
+        lock(db, "device:" + did)
+        upload_queue.cancel_jobs(db, did)
         chars = [
             r[0]
             for r in db.execute("SELECT character FROM owners WHERE device=?", (did,))
@@ -290,11 +370,11 @@ def stats():
                 "spellId": r["spell"],
                 "name": CATALOG[str(r["spell"])],
                 "group": r["area"],
-                "procs": r["procs"],
-                "combatProcs": r["combat"],
+                "procs": int(r["procs"]),
+                "combatProcs": int(r["combat"]),
                 "seconds": r["seconds"],
                 "contributors": r["contributors"],
-                "ppm": r["combat"] * 60 / r["seconds"] if r["seconds"] else None,
+                "ppm": int(r["combat"]) * 60 / r["seconds"] if r["seconds"] else None,
             }
             for r in rows
         ],
@@ -311,3 +391,10 @@ app.mount(
 @app.get("/")
 def index():
     return FileResponse(ROOT / "index.html")
+
+
+@app.get("/{page}.html")
+def portal_page(page: str):
+    if page not in {"compare", "quality", "downloads", "account"}:
+        raise HTTPException(404, "Page not found")
+    return FileResponse(ROOT / (page + ".html"))

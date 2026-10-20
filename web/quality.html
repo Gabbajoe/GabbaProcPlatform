@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Community proc measurements for WoW Classic Era and Hardcore. Compare observed effects across Open World, dungeons and raids."
+    />
+    <title>GabbaProc · Method &amp; data quality</title>
+    <link rel="icon" href="/assets/logo.png" />
+    <link rel="stylesheet" href="/assets/site.css" />
+    <script src="/assets/site.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="masthead">
+      <a class="brand" href="/"
+        ><img src="/assets/logo.png" alt="" width="36" height="36" /><b
+          >Gabba<span>Proc</span></b
+        ></a
+      ><span class="edition">CLASSIC ERA / HARDCORE</span
+      ><button id="language" type="button" aria-label="Switch language">
+        DE
+      </button>
+    </header>
+    <div class="layout">
+      <aside>
+        <nav aria-label="Main">
+          <a href="/"
+            ><span data-en="Observations" data-de="Messwerte"
+              >Observations</span
+            ></a
+          ><a href="/compare.html"
+            ><span data-en="Compare effects" data-de="Effekte vergleichen"
+              >Compare effects</span
+            ></a
+          ><a href="/quality.html" aria-current="page"
+            ><span
+              data-en="Method &amp; data quality"
+              data-de="Methodik &amp; Datenqualität"
+              >Method &amp; data quality</span
+            ></a
+          ><a href="/downloads.html"
+            ><span
+              data-en="Addon &amp; companion"
+              data-de="Addon &amp; Companion"
+              >Addon &amp; companion</span
+            ></a
+          ><a href="/account.html"
+            ><span data-en="My account" data-de="Mein Konto"
+              >My account</span
+            ></a
+          >
+        </nav>
+        <div class="side-note">
+          <strong
+            data-en="Community measurements"
+            data-de="Messwerte der Community"
+            >Community measurements</strong
+          >
+          <p data-en="Open source · EN / DE" data-de="Open Source · DE / EN">
+            Open source · EN / DE
+          </p>
+          <a href="https://github.com/Gabbajoe/GabbaProcPlatform">GitHub ↗</a>
+        </div>
+      </aside>
+      <main id="main">
+        <div class="page-heading">
+          <h1
+            data-en="Method &amp; data quality"
+            data-de="Methodik &amp; Datenqualität"
+          >
+            Method &amp; data quality
+          </h1>
+          <p
+            data-en="What is measured, what is shared and where the limits are."
+            data-de="Was gemessen und geteilt wird – und wo die Grenzen liegen."
+          >
+            What is measured, what is shared and where the limits are.
+          </p>
+        </div>
+        <div class="prose">
+          <section>
+            <h2>
+              <span
+                data-en="What the numbers mean"
+                data-de="Was die Zahlen bedeuten"
+                >What the numbers mean</span
+              >
+            </h2>
+            <p
+              data-en="The addon observes supported effects triggered by your own character. Rates measure procs per eligible combat minute, not probability per hit. Attack speed, targets, talents and equipment affect the result."
+              data-de="Das Addon erfasst unterstützte Effekte des eigenen Charakters. Die Rate misst Procs je geeigneter Kampfminute, keine Wahrscheinlichkeit pro Treffer. Angriffstempo, Ziele, Talente und Ausrüstung beeinflussen das Ergebnis."
+            >
+              The addon observes supported effects triggered by your own
+              character. Rates measure procs per eligible combat minute, not
+              probability per hit. Attack speed, targets, talents and equipment
+              affect the result.
+            </p>
+          </section>
+          <section>
+            <h2>
+              <span data-en="Data checks" data-de="Prüfung der Daten"
+                >Data checks</span
+              >
+            </h2>
+            <p
+              data-en="Uploads are checked for structure, counter consistency, ownership and duplicates. Extreme rates are withheld from public statistics. Plausible fabricated data cannot be reliably detected; these are community observations, not independently verified logs."
+              data-de="Uploads werden auf Struktur, konsistente Zähler, Zuordnung und Duplikate geprüft. Extreme Raten erscheinen nicht in öffentlichen Statistiken. Plausibel erfundene Werte lassen sich nicht zuverlässig erkennen; es sind Community-Beobachtungen, keine unabhängig verifizierten Logs."
+            >
+              Uploads are checked for structure, counter consistency, ownership
+              and duplicates. Extreme rates are withheld from public statistics.
+              Plausible fabricated data cannot be reliably detected; these are
+              community observations, not independently verified logs.
+            </p>
+          </section>
+          <section>
+            <h2>
+              <span data-en="History &amp; gaps" data-de="Historie &amp; Lücken"
+                >History &amp; gaps</span
+              >
+            </h2>
+            <p
+              data-en="The server can preserve only data that reaches it. WoW writes SavedVariables on reload or logout. Older addon versions retain only a rolling history; missing fights cannot be reconstructed from cumulative counters."
+              data-de="Der Server kann nur Daten erhalten, die ihn erreichen. WoW schreibt SavedVariables bei Reload oder Logout. Ältere Addon-Versionen halten nur einen begrenzten Verlauf; fehlende Kämpfe lassen sich aus Gesamtzählern nicht rekonstruieren."
+            >
+              The server can preserve only data that reaches it. WoW writes
+              SavedVariables on reload or logout. Older addon versions retain
+              only a rolling history; missing fights cannot be reconstructed
+              from cumulative counters.
+            </p>
+          </section>
+          <section>
+            <h2>
+              <span data-en="What is uploaded" data-de="Was übertragen wird"
+                >What is uploaded</span
+              >
+            </h2>
+            <p
+              data-en="Supported effect IDs, area groups, counters, combat time, retained segments and stable character/collection identifiers. Name and realm are optional. Account folder names, installation paths, chat and entire SavedVariables files are not uploaded."
+              data-de="Unterstützte Effekt-IDs, Gebietsgruppen, Zähler, Kampfzeit, gespeicherte Segmente und dauerhafte Charakter-/Sammlungskennungen. Name und Realm sind optional. Account-Ordnernamen, Installationspfade, Chat und vollständige SavedVariables-Dateien werden nicht hochgeladen."
+            >
+              Supported effect IDs, area groups, counters, combat time, retained
+              segments and stable character/collection identifiers. Name and
+              realm are optional. Account folder names, installation paths, chat
+              and entire SavedVariables files are not uploaded.
+            </p>
+          </section>
+          <section>
+            <h2>
+              <span
+                data-en="Names &amp; deletion"
+                data-de="Namen &amp; Löschung"
+                >Names &amp; deletion</span
+              >
+            </h2>
+            <p
+              data-en="Without names means pseudonymous: stable identifiers still connect contributions. Removing a public name cannot remove copies already downloaded by others. Device access can hide names or delete its contributions. Backups may retain deleted data until their retention period expires."
+              data-de="Ohne Namen bedeutet pseudonym: Dauerhafte Kennungen verbinden weiterhin Beiträge. Bereits von anderen heruntergeladene Namen können nicht zurückgerufen werden. Über den Gerätezugang lassen sich Namen entfernen oder eigene Beiträge löschen. In Sicherungen können gelöschte Daten bis zum Ablauf der Aufbewahrung verbleiben."
+            >
+              Without names means pseudonymous: stable identifiers still connect
+              contributions. Removing a public name cannot remove copies already
+              downloaded by others. Device access can hide names or delete its
+              contributions. Backups may retain deleted data until their
+              retention period expires.
+            </p>
+          </section>
+          <p>
+            <a href="https://github.com/Gabbajoe/GabbaProcPlatform"
+              ><span
+                data-en="Website &amp; companion source"
+                data-de="Quellcode von Website &amp; Companion"
+                >Website &amp; companion source</span
+              ></a
+            >
+            ·
+            <a href="https://github.com/Gabbajoe/GabbaProcTracker"
+              >Addon source</a
+            >
+          </p>
+        </div>
+      </main>
+    </div>
+    <footer>
+      <span>GabbaProc</span
+      ><a href="/quality.html"
+        ><span data-en="Data &amp; privacy" data-de="Daten &amp; Datenschutz"
+          >Data &amp; privacy</span
+        ></a
+      ><a href="mailto:gabbaproc@kellerkind.info">Kontakt</a
+      ><a href="https://nilskeller.de/seiten/Impressum.html"
+        ><span data-en="Legal notice" data-de="Impressum">Legal notice</span></a
+      >
+    </footer>
+  </body>
+</html>

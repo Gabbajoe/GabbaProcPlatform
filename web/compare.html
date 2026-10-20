@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Community proc measurements for WoW Classic Era and Hardcore. Compare observed effects across Open World, dungeons and raids."
+    />
+    <title>GabbaProc · Compare an effect</title>
+    <link rel="icon" href="/assets/logo.png" />
+    <link rel="stylesheet" href="/assets/site.css" />
+    <script src="/assets/site.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="masthead">
+      <a class="brand" href="/"
+        ><img src="/assets/logo.png" alt="" width="36" height="36" /><b
+          >Gabba<span>Proc</span></b
+        ></a
+      ><span class="edition">CLASSIC ERA / HARDCORE</span
+      ><button id="language" type="button" aria-label="Switch language">
+        DE
+      </button>
+    </header>
+    <div class="layout">
+      <aside>
+        <nav aria-label="Main">
+          <a href="/"
+            ><span data-en="Observations" data-de="Messwerte"
+              >Observations</span
+            ></a
+          ><a href="/compare.html" aria-current="page"
+            ><span data-en="Compare effects" data-de="Effekte vergleichen"
+              >Compare effects</span
+            ></a
+          ><a href="/quality.html"
+            ><span
+              data-en="Method &amp; data quality"
+              data-de="Methodik &amp; Datenqualität"
+              >Method &amp; data quality</span
+            ></a
+          ><a href="/downloads.html"
+            ><span
+              data-en="Addon &amp; companion"
+              data-de="Addon &amp; Companion"
+              >Addon &amp; companion</span
+            ></a
+          ><a href="/account.html"
+            ><span data-en="My account" data-de="Mein Konto"
+              >My account</span
+            ></a
+          >
+        </nav>
+        <div class="side-note">
+          <strong
+            data-en="Community measurements"
+            data-de="Messwerte der Community"
+            >Community measurements</strong
+          >
+          <p data-en="Open source · EN / DE" data-de="Open Source · DE / EN">
+            Open source · EN / DE
+          </p>
+          <a href="https://github.com/Gabbajoe/GabbaProcPlatform">GitHub ↗</a>
+        </div>
+      </aside>
+      <main id="main">
+        <div class="page-heading">
+          <h1 data-en="Compare an effect" data-de="Einen Effekt vergleichen">
+            Compare an effect
+          </h1>
+          <p
+            data-en="Open World, dungeons and raids side by side."
+            data-de="Open World, Dungeons und Raids nebeneinander."
+          >
+            Open World, dungeons and raids side by side.
+          </p>
+        </div>
+        <section class="panel compare-picker">
+          <label
+            ><span
+              data-en="Choose an observed effect"
+              data-de="Erfassten Effekt auswählen"
+              >Choose an observed effect</span
+            ><select id="effect-select">
+              <option>—</option>
+            </select></label
+          ><button id="refresh">
+            <span data-en="Refresh" data-de="Aktualisieren">Refresh</span>
+          </button>
+        </section>
+        <p id="status" role="status" aria-live="polite"></p>
+        <div id="comparison" class="comparison"></div>
+        <section class="prose">
+          <h2>
+            <span
+              data-en="Read the time alongside the rate"
+              data-de="Kampfzeit und Rate gemeinsam betrachten"
+              >Read the time alongside the rate</span
+            >
+          </h2>
+          <p
+            data-en="Each area uses its own sum of combat procs and eligible combat time. Exposure can overlap between effects, so it is not unique playtime. Small samples can fluctuate strongly."
+            data-de="Für jedes Gebiet werden Kampf-Procs und geeignete Kampfzeit getrennt summiert. Zeiten verschiedener Effekte können sich überschneiden und sind keine eindeutige Spielzeit. Kleine Stichproben können stark schwanken."
+          >
+            Each area uses its own sum of combat procs and eligible combat time.
+            Exposure can overlap between effects, so it is not unique playtime.
+            Small samples can fluctuate strongly.
+          </p>
+          <a href="/quality.html"
+            ><span
+              data-en="Method &amp; limitations →"
+              data-de="Methodik &amp; Grenzen →"
+              >Method &amp; limitations →</span
+            ></a
+          >
+        </section>
+      </main>
+    </div>
+    <footer>
+      <span>GabbaProc</span
+      ><a href="/quality.html"
+        ><span data-en="Data &amp; privacy" data-de="Daten &amp; Datenschutz"
+          >Data &amp; privacy</span
+        ></a
+      ><a href="mailto:gabbaproc@kellerkind.info">Kontakt</a
+      ><a href="https://nilskeller.de/seiten/Impressum.html"
+        ><span data-en="Legal notice" data-de="Impressum">Legal notice</span></a
+      >
+    </footer>
+  </body>
+</html>

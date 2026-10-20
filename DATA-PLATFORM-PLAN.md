@@ -1,6 +1,7 @@
 # Plan: dauerhafte Messdaten, PostgreSQL und Upload-Warteschlange
 
-Stand: 20.10.2026. **Nur Planung; noch keine Umsetzung oder Serveränderung.**
+Stand: 20.10.2026. Entwicklung auf `feature/durable-data-platform` begonnen;
+Produktions-Datenbank und Website noch nicht umgestellt.
 
 ## Ziel und feste Entscheidungen
 
@@ -133,6 +134,27 @@ PostgreSQL-Backups mit `pg_dump`/`pg_restore`, dokumentierter Aufbewahrung und r
 6. Konkrete Host-Konfiguration und Migration prüfen, dann separat deployen. Website-Texte und Versionshinweise an tatsächliche Archiv- und Kompatibilitätsgarantien anpassen.
 
 Erst nach diesen Tests von einer dauerhaften Archivierung sprechen. Alte Datenlücken bleiben sichtbar; nicht gespeicherte WoW-Daten können weder Companion noch Server nachträglich retten.
+
+## 9. Ergänzung: Nutzerkonten und WoW-Datenportal
+
+Entscheidung vom 20.10.2026: dunkles, blaues WoW-Datenportal mit eigenständigen Bereichen für Messwerte, Vergleiche, Datenqualität, Downloads und persönliches Konto. Keine lange Werbe-Landingpage. Deutsch und Englisch bleiben gleichwertig.
+
+Ein GabbaProc-Konto besitzt Charakterzuordnungen und mehrere widerrufbare Upload-Geräte. Öffentliche Daten lassen sich ohne Anmeldung lesen. Login-Anbieter sind nur Zugangswege zu diesem internen Konto: Google, GitHub, Discord, Microsoft, Apple sowie passwortloser E-Mail-Zugang. Momentan sind weder OAuth-Anwendungen noch Mailversand eingerichtet.
+
+- Anbieter-Identitäten über unveränderliche Provider-/Issuer-/Subject-Kombinationen zuordnen, nicht über Anzeigenamen oder E-Mail-Adressen. Verknüpfung zusätzlicher Anbieter nur aus einem erneut bestätigten bestehenden Konto; keine automatische Kontozusammenführung bei gleicher E-Mail.
+- Bestehende Geräte und Messdaten nur gegen Nachweis des bisherigen Geräte-Tokens an ein Konto anbinden. Eine Charakter-UUID allein beweist keine Berechtigung.
+- Companion öffnet den Systembrowser zur Anmeldung und expliziten Gerätefreigabe. Ein kurzlebiger, einmaliger Kopplungsvorgang liefert einen eigenen widerrufbaren Gerätezugang; Provider-Tokens gehören nicht in die Companion-App.
+- Für OAuth/OIDC eine gepflegte Bibliothek einsetzen; state, Nonce, PKCE soweit unterstützt, Signaturen, Issuer, Audience, Ablauf und exakte Callback-Adressen prüfen. GitHub und Discord verwenden ihren jeweiligen OAuth-Profilendpunkt statt eines vorausgesetzten OIDC-ID-Tokens.
+- Browser-Sitzungen serverseitig verwalten, Cookie Secure/HttpOnly, CSRF-Schutz für Änderungen und frische Anmeldung für Verknüpfen, Löschen und Gerätefreigaben. Apple-Callback mit POST benötigt gesonderte SameSite-/State-Behandlung.
+- E-Mail-Zugang mit kurzlebigen Einmallinks oder Einmalcodes, Rate-Limits und generischen Antworten. Kein Passwortbestand. Versand erst nach SMTP-Konfiguration und Prüfung von Absender, SPF/DKIM/DMARC aktivieren; keine Anmeldetokens in Logs.
+- Die öffentliche Sichtbarkeit eines Charakters ist unabhängig vom Konto-Login. Login-Mail und Providerprofil werden nicht zu öffentlichen Beitragsnamen.
+- Accountlöschung und Gerätewiderruf umfassen wartende Jobs. Das Trennen eines Login-Anbieters darf nicht versehentlich den letzten Zugangsweg entfernen.
+- Invites werden ein optionales Mittel zur Begrenzung einer Testphase und sind nicht mehr die dauerhafte Benutzerverwaltung. Bestandszugänge bleiben während der Migration nutzbar.
+- Nur konfigurierte und getestete Anbieter als Login-Schaltflächen anbieten. Keine scheinbar funktionierenden Platzhalter. Live-Abnahme jedes Anbieters erfordert dessen Registrierung und Zugangsdaten außerhalb von Git.
+
+Einrichtung: je Anbieter eine Web-Anwendung für `https://gabbaproc.kellerkind.info` registrieren, exakte Callbacks unter `/api/auth/callback/<anbieter>` hinterlegen und minimale Login-Berechtigungen verwenden. Google, GitHub und Discord zuerst; Microsoft mit expliziter Unterstützung persönlicher Konten. Apple nach Services-ID/App-ID/Schlüssel-Konfiguration; E-Mail nach Einrichtung des Versanddienstes. Diese Reihenfolge ist eine Umsetzungsempfehlung, keine bereits erfolgte Aktivierung.
+
+Primärquellen zur Anmeldung: [Google OIDC](https://developers.google.com/identity/openid-connect/openid-connect), [GitHub OAuth](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps), [Discord OAuth](https://discord.com/developers/docs/topics/oauth2), [Microsoft-Kontotypen](https://learn.microsoft.com/en-us/security/zero-trust/develop/identity-supported-account-types), [Apple-Webkonfiguration](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web).
 
 ## Primärquellen
 
