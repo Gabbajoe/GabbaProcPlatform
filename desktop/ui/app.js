@@ -13,11 +13,13 @@ const de = {
   scan: "WoW suchen",
   folder: "WoW-Ordner auswählen",
   sync: "3 · Synchronisieren",
-  auto: "Geänderte Exporte automatisch jede Minute hochladen",
+  auto: "Geänderte Exporte automatisch hochladen",
+  interval: "Upload-Intervall",
+  quit: "App beenden",
   startup: "Bei der Anmeldung starten",
   updates: "Signierte App-Updates automatisch installieren (App startet neu)",
   running:
-    "Automatische Uploads laufen, solange die App geöffnet ist. Das Schließen des Fensters beendet die App. Frühere Kopien öffentlich sichtbarer Namen können nicht zurückgerufen werden.",
+    "Beim Schließen läuft die App im Tray weiter. Über das Tray-Menü oder „App beenden“ wird sie vollständig beendet. Ohne verfügbares Tray beendet das Schließen die App. Frühere Kopien öffentlich sichtbarer Namen können nicht zurückgerufen werden.",
   upload: "Ausgewählte Charaktere hochladen",
   update: "Nach Updates suchen",
   preview: "Upload-Vorschau",
@@ -42,6 +44,7 @@ function language() {
   for (const [el, en] of original)
     el.textContent = lang === "de" ? de[el.dataset.t] || en : en;
   localStorage.setItem("language", lang);
+  run(() => invoke("set_language", { language: lang }));
 }
 function status(v) {
   $("status").textContent =
@@ -57,6 +60,7 @@ async function run(f) {
 async function overview() {
   const s = await invoke("overview");
   $("auto").checked = s.autoUpload;
+  $("interval").value = String(s.uploadIntervalMinutes || 15);
   $("credential").textContent = s.hasToken
     ? s.persistentToken
       ? text("Saved in keyring", "Im Schlüsselbund gespeichert")
@@ -67,15 +71,46 @@ async function overview() {
 async function scan() {
   const rows = await invoke("discover");
   $("characters").replaceChildren();
+  const groups = new Map();
   for (const row of rows) {
+    const installation = row.installationPath || "";
+    if (!groups.has(installation)) {
+      const group = document.createElement("div");
+      group.className = "installation";
+      const heading = document.createElement("h3");
+      heading.textContent = row.client || "Classic Era / Hardcore";
+      const path = document.createElement("p");
+      path.className = "source-path";
+      path.textContent = installation;
+      group.append(heading, path);
+      $("characters").append(group);
+      groups.set(installation, group);
+    }
+    const group = groups.get(installation);
     const box = document.createElement("div");
     box.className = "character";
+    const title = document.createElement("strong");
+    title.textContent = [row.localName, row.realm].filter(Boolean).join(" · ");
+    const source = document.createElement("details");
+    source.className = "source";
+    const summary = document.createElement("summary");
+    summary.textContent = text("Local file path", "Lokaler Dateipfad");
+    const path = document.createElement("p");
+    path.className = "source-path";
+    path.textContent = row.sourcePath || "";
+    source.append(summary, path);
+    box.append(title, source);
     if (row.error) {
-      box.textContent = text(
-        row.error,
-        "Export fehlt oder ist ungültig. In WoW exportieren und /reload ausführen.",
-      );
-      $("characters").append(box);
+      const errors = {
+        missing_snapshot: text("No export snapshot yet. In this character's WoW session, use /gpt export, then /reload or log out.", "Noch kein Export-Snapshot. Mit diesem Charakter in WoW /gpt export und danach /reload ausführen oder ausloggen."),
+        invalid_export: text("Export incomplete or unsupported. Update the addon, export again and /reload.", "Export unvollständig oder nicht unterstützt. Addon aktualisieren, erneut exportieren und /reload ausführen."),
+        unreadable_export: text("File cannot be read or parsed. Export again in WoW and /reload.", "Datei nicht lesbar oder fehlerhaft. In WoW erneut exportieren und /reload ausführen."),
+        duplicate: text("Duplicate character ID. The first listed export for this character is used.", "Doppelte Charakter-ID. Der zuerst aufgeführte Export dieses Charakters wird verwendet."),
+      };
+      const error = document.createElement("p");
+      error.textContent = errors[row.error] || text("Invalid export.", "Ungültiger Export.");
+      box.append(error);
+      group.append(box);
       continue;
     }
     const enabled = document.createElement("input");
@@ -137,7 +172,7 @@ async function scan() {
         );
       });
     box.append(label, label2, preview, hide);
-    $("characters").append(box);
+    group.append(box);
   }
   if (!rows.length)
     $("characters").textContent = text(
@@ -170,6 +205,8 @@ $("saveToken").onclick = () =>
   });
 $("auto").onchange = () =>
   run(() => invoke("set_auto", { enabled: $("auto").checked }));
+$("interval").onchange = () => run(() => invoke("set_interval", { minutes: Number($("interval").value) }));
+$("quit").onclick = () => run(() => invoke("quit_app"));
 $("startup").onchange = () =>
   run(async () => {
     if ($("startup").checked) await window.__TAURI__.autostart.enable();
@@ -237,6 +274,12 @@ $("updates").onchange = () => {
   if ($("updates").checked) run(() => update(false));
 };
 $("update").onclick = () => run(() => update(true));
+for (let minutes = 5; minutes <= 60; minutes += 5) {
+  const option = document.createElement("option");
+  option.value = String(minutes);
+  option.textContent = `${minutes} min`;
+  $("interval").append(option);
+}
 language();
 run(async () => {
   await overview();

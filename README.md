@@ -14,7 +14,7 @@ Community proc research for WoW Classic Era / Hardcore. Website, API and lightwe
 2. Install the companion for Windows, macOS or Linux.
 3. Get a single-use pilot invite from the operator and exchange it on the website for an upload token.
 4. Save the token in the app. Select characters; uploads are anonymous by default. Public character name and realm are an explicit per-character choice.
-5. Enable automatic uploads if desired. Changed exports upload every minute while the app is open. Closing the window quits the app. Start-at-login and signed automatic app updates are optional.
+5. Enable automatic uploads if desired. Choose an upload interval from 5 to 60 minutes (default: 15). Closing the window keeps the app running in the tray; use Open or Quit in its menu, or Quit app in the window. If tray creation fails, closing quits the app. Start-at-login and signed automatic app updates are optional.
 
 The app searches common Battle.net, Wine, Faugus and Steam prefixes. A manual WoW-folder picker handles other installations. Only `_classic_era_` character exports are considered. It never executes Lua. Use the preview to inspect the exact allowlisted JSON before uploading.
 

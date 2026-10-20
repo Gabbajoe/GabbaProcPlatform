@@ -47,7 +47,7 @@
         <h2 data-t="sync">3 · Synchronize</h2>
         <label
           ><input type="checkbox" id="auto" /><span data-t="auto"
-            >Automatically upload changed exports every minute</span
+            >Automatically upload changed exports</span
           ></label
         ><label
           ><input type="checkbox" id="startup" /><span data-t="startup"
@@ -58,12 +58,14 @@
             >Automatically install signed app updates (app restarts)</span
           ></label
         >
+        <label><span data-t="interval">Upload interval</span><select id="interval"></select></label>
         <p data-t="running">
-          Automatic uploads run while this app is open. Closing the window quits
-          the app. Anonymity does not remove copies of previously public names.
+          Closing the window keeps the app running in the tray. Use the tray menu
+          or Quit app to exit completely. Without an available tray, closing quits the app. Anonymity does not remove copies of previously public names.
         </p>
         <button id="upload" data-t="upload">Upload selected characters</button
         ><button id="update" data-t="update">Check for updates</button>
+        <button id="quit" data-t="quit">Quit app</button>
         <pre id="status" role="status" aria-live="polite"></pre>
       </section>
       <details>

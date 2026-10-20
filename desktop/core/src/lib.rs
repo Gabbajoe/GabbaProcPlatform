@@ -434,6 +434,47 @@ pub fn roots(home: &Path) -> Vec<PathBuf> {
     }
     out
 }
+/// Local-only source labels; these never enter the upload payload.
+pub fn source_labels(path: &Path) -> Value {
+    let character = path.parent().and_then(Path::parent);
+    let realm = character.and_then(Path::parent);
+    let installation = path
+        .ancestors()
+        .find(|p| p.file_name().is_some_and(|n| n == "_classic_era_"));
+    json!({
+        "sourcePath": path.to_string_lossy(),
+        "installationPath": installation.unwrap_or(path).to_string_lossy(),
+        "client": "Classic Era / Hardcore",
+        "localName": character.and_then(Path::file_name).unwrap_or_default().to_string_lossy(),
+        "realm": realm.and_then(Path::file_name).unwrap_or_default().to_string_lossy(),
+    })
+}
+
+pub fn valid_upload_interval(minutes: u64) -> bool {
+    (5..=60).contains(&minutes) && minutes % 5 == 0
+}
+
+/// Quote one executable path for a freedesktop Exec field, not a shell command.
+pub fn desktop_exec(path: &str) -> std::result::Result<String, String> {
+    if path.contains(['\n', '\r', '\0']) {
+        return Err("Invalid launcher path".into());
+    }
+    let mut quoted = String::from("\"");
+    for ch in path.chars() {
+        match ch {
+            '%' => quoted.push_str("%%"),
+            '\\' => quoted.push_str("\\\\\\\\"),
+            '"' | '$' | '`' => {
+                quoted.push_str("\\\\");
+                quoted.push(ch);
+            }
+            _ => quoted.push(ch),
+        }
+    }
+    quoted.push('"');
+    Ok(quoted)
+}
+
 pub fn discover(roots: &[PathBuf]) -> Vec<PathBuf> {
     let mut result = HashSet::new();
     let mut visited = 0usize;
@@ -478,6 +519,38 @@ pub fn discover(roots: &[PathBuf]) -> Vec<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn source_labels_keep_distinct_installations_and_invalid_exports_identifiable() {
+        let a = source_labels(Path::new(
+            "/games/one/_classic_era_/WTF/Account/A/Realm/Hero/SavedVariables/GabbaProcTracker.lua",
+        ));
+        let b = source_labels(Path::new(
+            "/games/two/_classic_era_/WTF/Account/A/Realm/Hero/SavedVariables/GabbaProcTracker.lua",
+        ));
+        assert_eq!(a["localName"], "Hero");
+        assert_eq!(a["realm"], "Realm");
+        assert_eq!(a["client"], "Classic Era / Hardcore");
+        assert_ne!(a["installationPath"], b["installationPath"]);
+    }
+    #[test]
+    fn upload_intervals_are_bounded() {
+        for n in [5, 15, 60] {
+            assert!(valid_upload_interval(n));
+        }
+        for n in [0, 1, 6, 61, u64::MAX] {
+            assert!(!valid_upload_interval(n));
+        }
+    }
+    #[test]
+    fn desktop_paths_cannot_inject_fields_or_commands() {
+        assert_eq!(
+            desktop_exec("/a b/app.AppImage").unwrap(),
+            "\"/a b/app.AppImage\""
+        );
+        assert_eq!(desktop_exec("/a%f/app").unwrap(), "\"/a%%f/app\"");
+        assert!(desktop_exec("/a\nExec=bad").is_err());
+        assert!(desktop_exec("/a$`\"/app").unwrap().contains("\\\\$"));
+    }
     #[test]
     fn accepts_tables_and_utf8() {
         let v=parse("GabbaProcTrackerDB = { [\"test\"] = {1,2,}, name = \"Jäger\", -- comment\n flag=true, }").unwrap();
