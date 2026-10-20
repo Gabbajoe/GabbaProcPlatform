@@ -101,3 +101,8 @@ navigation. Only the active panel scrolls; navigation stays visible. The header
 reports whether upload credentials are loaded, not whether the server is online.
 On first launch the UI follows the system language (German, otherwise English).
 An explicit language selection is retained across restarts.
+
+Development build dev.6 adds a subtle moving highlight to the active upload or
+processing track, including when no packet is confirmed yet. The highlight does
+not change packet percentages. It stops on pause, retry, errors and completion,
+and is disabled when the operating system requests reduced motion.

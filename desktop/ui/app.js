@@ -193,7 +193,16 @@ function renderProgress(s) {
           bar.max = p.total;
           bar.value = completed;
           bar.setAttribute("aria-label", title);
-          row.append(count, bar);
+          const track = document.createElement("div");
+          track.className = "progress-track";
+          track.dataset.active = String(
+            completed < p.total &&
+              (stage === "upload"
+                ? phase === "sending"
+                : ["waiting", "checking"].includes(phase)),
+          );
+          track.append(bar);
+          row.append(count, track);
         }
       } else if (phase === "preparing") {
         const bar = document.createElement("progress");
