@@ -36,10 +36,12 @@ CREATE TABLE IF NOT EXISTS segments(character TEXT NOT NULL, collection TEXT NOT
 CREATE TABLE IF NOT EXISTS archive_usage(character TEXT NOT NULL, collection TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY(character,collection), FOREIGN KEY(character,collection) REFERENCES snapshots(character,collection) ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY, created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS account_identities(provider TEXT NOT NULL, subject TEXT NOT NULL, account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, display TEXT NOT NULL, PRIMARY KEY(provider,subject));
+CREATE TABLE IF NOT EXISTS account_profiles(account TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE, username TEXT NOT NULL, username_key TEXT NOT NULL UNIQUE);
 CREATE TABLE IF NOT EXISTS account_sessions(hash TEXT PRIMARY KEY, account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, expires INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS account_devices(device TEXT PRIMARY KEY REFERENCES devices(id), account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS auth_flows(hash TEXT PRIMARY KEY, binding TEXT NOT NULL, provider TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS device_links(hash TEXT PRIMARY KEY, user_code TEXT UNIQUE NOT NULL, account TEXT REFERENCES accounts(id) ON DELETE CASCADE, device TEXT REFERENCES devices(id), expires INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS device_reconnects(hash TEXT PRIMARY KEY REFERENCES device_links(hash) ON DELETE CASCADE, device TEXT NOT NULL REFERENCES devices(id));
 CREATE INDEX IF NOT EXISTS account_sessions_expiry ON account_sessions(expires);
 CREATE INDEX IF NOT EXISTS auth_flows_expiry ON auth_flows(expires);
 CREATE INDEX IF NOT EXISTS device_links_expiry ON device_links(expires);

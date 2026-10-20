@@ -104,15 +104,20 @@
   }
   function render() {
     el("signed-account").hidden = !account;
-    const heading = el("account-login").querySelector("h2");
+    const login = el("account-login");
     if (account) {
-      heading.textContent = tr(
-        "Link another sign-in method",
-        "Weitere Anmeldemethode verknüpfen",
-      );
+      if (login.parentElement !== el("account-method-slot"))
+        el("account-method-slot").append(login);
+      login.classList.add("embedded-login");
+      login.querySelector("h2").hidden = true;
+      for (const p of login.querySelectorAll(":scope > p")) p.hidden = true;
+      if (challenge) el("account-methods").open = true;
+      el("existing-invite").hidden = true;
     }
     el("provider-buttons").replaceChildren();
-    for (const provider of available) {
+    for (const provider of available.filter(
+      (p) => !account?.identities.some((i) => i.provider === p),
+    )) {
       const button = document.createElement("button");
       const name = provider === "github" ? "GitHub" : "Discord";
       button.textContent = account
@@ -129,20 +134,55 @@
     }
     if (!account) return;
     const pending = pendingPairing();
+    el("account-name").textContent =
+      account.username ||
+      tr("Choose your username", "Wähle deinen Benutzernamen");
+    el("account-expiry").textContent = account.sessionExpiresAt
+      ? tr("Signed in until ", "Angemeldet bis ") +
+        new Date(account.sessionExpiresAt * 1000).toLocaleString(
+          document.documentElement.lang,
+        )
+      : "";
+    if (!el("account-username").value)
+      el("account-username").value = account.username || "";
+    window.dispatchEvent(
+      new CustomEvent("gabbaproc-account", { detail: account }),
+    );
     if (pending && !pairingShown) {
+      el("pair-settings").open = true;
       pairingShown = true;
       el("pair-code").value = pending.code;
       el("pair-approve").scrollIntoView({ block: "center" });
     }
-    el("account-identities").textContent = account.identities
-      .map((i) => i.provider + ": " + i.display)
-      .join(" · ");
-    el("account-devices").replaceChildren();
-    for (const device of account.devices) {
+    el("account-identities").replaceChildren();
+    for (const identity of account.identities) {
       const row = document.createElement("p");
+      row.className = "identity-row";
+      const label = document.createElement("span");
+      label.className = "identity-provider";
+      label.textContent =
+        { email: "E-Mail", github: "GitHub", discord: "Discord" }[
+          identity.provider
+        ] || identity.provider;
+      const value = document.createElement("span");
+      value.textContent = identity.display;
+      row.append(label, value);
+      el("account-identities").append(row);
+    }
+    el("account-devices").replaceChildren();
+    if (!account.devices.length) {
+      el("account-devices").textContent = tr(
+        "No companion connected yet.",
+        "Noch keine Companion-App verbunden.",
+      );
+      el("pair-settings").open = true;
+    }
+    for (const device of account.devices) {
+      const row = document.createElement("div");
+      row.className = "device-row";
       const label = document.createElement("span");
       label.textContent =
-        tr("Device ", "Gerät ") +
+        tr("Companion · ", "Companion · ") +
         device.id.slice(0, 8) +
         " · " +
         new Date(device.created * 1000).toLocaleDateString() +
@@ -172,6 +212,27 @@
     }
     render();
   }
+  el("account-profile").onsubmit = (event) => {
+    event.preventDefault();
+    action(event.submitter, async () => {
+      try {
+        await request("/account/profile", "PUT", {
+          username: el("account-username").value.trim(),
+        });
+      } catch (error) {
+        if (error.status === 409) {
+          status(
+            "This username is already taken.",
+            "Dieser Benutzername ist bereits vergeben.",
+          );
+          return;
+        }
+        throw error;
+      }
+      await refresh();
+      status("Username saved.", "Benutzername gespeichert.");
+    });
+  };
   el("email-login").onsubmit = (event) => {
     event.preventDefault();
     action(event.submitter, async () => {
@@ -230,6 +291,7 @@
         } catch (_) {}
       }
       el("pair-code").value = "";
+      el("pair-settings").open = false;
       await refresh();
       status(
         "Approved. The companion will finish connecting.",

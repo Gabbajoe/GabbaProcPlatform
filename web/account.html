@@ -155,144 +155,220 @@
           </p>
         </section>
         <p id="account-status" role="status" aria-live="polite"></p>
-        <section id="signed-account" class="panel" hidden>
-          <h2 data-de="Dein Konto" data-en="Your account">Your account</h2>
-          <p id="account-identities"></p>
-          <button id="account-logout" data-de="Abmelden" data-en="Sign out">
-            Sign out
-          </button>
-          <h3 data-de="Companion verbinden" data-en="Connect companion">
-            Connect companion
-          </h3>
-          <p
-            data-de="Die Companion-App trägt ihren Gerätecode automatisch ein. Vergleiche ihn mit deiner App und bestätige die Verbindung. Bei Bedarf kannst du ihn auch selbst eingeben."
-            data-en="The companion fills in its device code automatically. Compare it with your app and confirm the connection. You can also enter the code manually."
-          >
-            The companion fills in its device code automatically. Compare it
-            with your app and confirm the connection. You can also enter the
-            code manually.
-          </p>
-          <form id="pair-approve">
-            <label for="pair-code" data-de="Gerätecode" data-en="Device code"
-              >Device code</label
-            ><input
-              id="pair-code"
-              autocomplete="off"
-              maxlength="10"
-              pattern="[A-Fa-f0-9]{10}"
-              required
-            /><button
-              type="submit"
-              data-de="Diese App verbinden"
-              data-en="Connect this app"
-            >
-              Connect this app
-            </button>
-          </form>
-          <h3
-            data-de="Bestehenden Upload-Zugang übernehmen"
-            data-en="Link existing upload access"
-          >
-            Link existing upload access
-          </h3>
-          <p
-            data-de="Wenn du bereits mit der Companion-App hochgeladen hast, verknüpfe deren bisherigen Token. So bleiben deine Charaktere und Beiträge zugeordnet."
-            data-en="If you have already uploaded with the companion, link its existing token to preserve ownership of your characters and contributions."
-          >
-            If you have already uploaded with the companion, link its existing
-            token to preserve ownership of your characters and contributions.
-          </p>
-          <form id="claim-device">
-            <input
-              id="claim-token"
-              type="password"
-              autocomplete="off"
-              minlength="30"
-              maxlength="100"
-              required
-              aria-label="Upload token"
-            /><button
-              type="submit"
-              data-de="Bestehenden Token verknüpfen"
-              data-en="Link existing token"
-            >
-              Link existing token
-            </button>
-          </form>
-          <details>
-            <summary>
+        <section id="signed-account" hidden>
+          <div class="panel account-overview">
+            <div>
               <span
-                data-de="Neuen Upload-Token für Companion 0.1.2 erstellen"
-                data-en="Create a new upload token for Companion 0.1.2"
-                >Create a new upload token for Companion 0.1.2</span
+                class="account-badge"
+                data-en="Signed in"
+                data-de="Angemeldet"
+                >Signed in</span
               >
+              <h2 id="account-name">My account</h2>
+              <p id="account-expiry"></p>
+            </div>
+            <button id="account-logout" data-de="Abmelden" data-en="Sign out">
+              Sign out
+            </button>
+          </div>
+          <div class="account-grid">
+            <section class="panel account-devices-card">
+              <h3 data-de="Verbundene Geräte" data-en="Connected devices">
+                Connected devices
+              </h3>
+              <div id="account-devices"></div>
+              <p
+                data-de="Widerrufen stoppt weitere Uploads, löscht aber keine bisherigen Messdaten."
+                data-en="Revoking stops further uploads but does not delete previous measurements."
+              >
+                Revoking stops further uploads but does not delete previous
+                measurements.
+              </p>
+
+              <details id="pair-settings">
+                <summary
+                  data-de="Companion verbinden"
+                  data-en="Connect companion"
+                >
+                  Connect companion
+                </summary>
+                <p
+                  data-de="Die Companion-App trägt ihren Gerätecode automatisch ein. Vergleiche ihn mit deiner App und bestätige die Verbindung. Bei Bedarf kannst du ihn auch selbst eingeben."
+                  data-en="The companion fills in its device code automatically. Compare it with your app and confirm the connection. You can also enter the code manually."
+                >
+                  The companion fills in its device code automatically. Compare
+                  it with your app and confirm the connection. You can also
+                  enter the code manually.
+                </p>
+                <form id="pair-approve">
+                  <label
+                    for="pair-code"
+                    data-de="Gerätecode"
+                    data-en="Device code"
+                    >Device code</label
+                  ><input
+                    id="pair-code"
+                    autocomplete="off"
+                    maxlength="10"
+                    pattern="[A-Fa-f0-9]{10}"
+                    required
+                  /><button
+                    type="submit"
+                    data-de="Diese App verbinden"
+                    data-en="Connect this app"
+                  >
+                    Connect this app
+                  </button>
+                </form>
+              </details>
+            </section>
+            <section class="panel account-settings-card">
+              <h3 data-de="Kontoeinstellungen" data-en="Account settings">
+                Account settings
+              </h3>
+              <form id="account-profile">
+                <label
+                  for="account-username"
+                  data-de="Benutzername"
+                  data-en="Username"
+                  >Username</label
+                >
+                <input
+                  id="account-username"
+                  autocomplete="username"
+                  minlength="3"
+                  maxlength="24"
+                  pattern="[A-Za-z0-9][A-Za-z0-9_.\-]{2,23}"
+                  required
+                  aria-describedby="username-help"
+                />
+                <small
+                  id="username-help"
+                  data-de="3–24 Zeichen: Buchstaben A–Z, Zahlen, Punkt, Unterstrich oder Bindestrich."
+                  data-en="3–24 characters: letters A–Z, numbers, dot, underscore or hyphen."
+                  >3–24 characters: letters A–Z, numbers, dot, underscore or
+                  hyphen.</small
+                >
+                <button
+                  type="submit"
+                  data-de="Namen speichern"
+                  data-en="Save username"
+                >
+                  Save username
+                </button>
+              </form>
+              <h3 data-de="Anmeldemethoden" data-en="Sign-in methods">
+                Sign-in methods
+              </h3>
+              <div id="account-identities"></div>
+              <details id="account-methods">
+                <summary
+                  data-de="Weitere Anmeldemethode verknüpfen"
+                  data-en="Link another sign-in method"
+                >
+                  Link another sign-in method
+                </summary>
+                <div id="account-method-slot"></div>
+              </details>
+            </section>
+          </div>
+          <details class="panel account-advanced">
+            <summary
+              data-de="Manuelle Upload-Tokens"
+              data-en="Manual upload tokens"
+            >
+              Manual upload tokens
             </summary>
             <p
-              data-de="Für einen neuen Zugang. Bereits hochgeladene Charaktere bleiben an ihren bisherigen Gerätezugang gebunden."
-              data-en="For new access. Previously uploaded characters remain owned by their existing device access."
+              data-de="Wenn du bereits mit der Companion-App hochgeladen hast, verknüpfe deren bisherigen Token. So bleiben deine Charaktere und Beiträge zugeordnet."
+              data-en="If you have already uploaded with the companion, link its existing token to preserve ownership of your characters and contributions."
             >
-              For new access. Previously uploaded characters remain owned by
-              their existing device access.
+              If you have already uploaded with the companion, link its existing
+              token to preserve ownership of your characters and contributions.
             </p>
-            <button
-              id="account-new-device"
-              data-de="Neuen Token erstellen"
-              data-en="Create new token"
-            >
-              Create new token</button
-            ><input
-              id="account-device-token"
-              type="password"
-              readonly
-              hidden
-              autocomplete="off"
-              aria-label="New upload token"
-            /><button
-              id="account-copy-token"
-              hidden
-              data-de="Token kopieren"
-              data-en="Copy token"
-            >
-              Copy token
-            </button>
-          </details>
-          <h3 data-de="Verbundene Geräte" data-en="Connected devices">
-            Connected devices
-          </h3>
-          <div id="account-devices"></div>
-          <p
-            data-de="Widerrufen stoppt weitere Uploads, löscht aber keine bisherigen Messdaten."
-            data-en="Revoking stops further uploads but does not delete previous measurements."
-          >
-            Revoking stops further uploads but does not delete previous
-            measurements.
-          </p>
-          <details>
-            <summary>
-              <span
-                data-de="Konto und Beiträge löschen"
-                data-en="Delete account and contributions"
-                >Delete account and contributions</span
+            <form id="claim-device">
+              <input
+                id="claim-token"
+                type="password"
+                autocomplete="off"
+                minlength="30"
+                maxlength="100"
+                required
+                aria-label="Upload token"
+              /><button
+                type="submit"
+                data-de="Bestehenden Token verknüpfen"
+                data-en="Link existing token"
               >
-            </summary>
-            <p
-              data-de="Entfernt dieses Konto und die Beiträge aller verknüpften Geräte. Alle zugehörigen Upload-Zugänge werden widerrufen. Lokale Dateien bleiben erhalten; Hinweise zu Backups stehen im Datenschutz."
-              data-en="Removes this account and contributions from all linked devices, and revokes their upload access. Local files remain; see the privacy notice for backups."
-            >
-              Removes this account and contributions from all linked devices,
-              and revokes their upload access. Local files remain; see the
-              privacy notice for backups.
-            </p>
-            <button
-              id="account-delete"
-              data-de="Konto und Beiträge endgültig löschen"
-              data-en="Permanently delete account and contributions"
-            >
-              Permanently delete account and contributions
-            </button>
+                Link existing token
+              </button>
+            </form>
+            <details>
+              <summary>
+                <span
+                  data-de="Neuen Upload-Token für Companion 0.1.2 erstellen"
+                  data-en="Create a new upload token for Companion 0.1.2"
+                  >Create a new upload token for Companion 0.1.2</span
+                >
+              </summary>
+              <p
+                data-de="Für einen neuen Zugang. Bereits hochgeladene Charaktere bleiben an ihren bisherigen Gerätezugang gebunden."
+                data-en="For new access. Previously uploaded characters remain owned by their existing device access."
+              >
+                For new access. Previously uploaded characters remain owned by
+                their existing device access.
+              </p>
+              <button
+                id="account-new-device"
+                data-de="Neuen Token erstellen"
+                data-en="Create new token"
+              >
+                Create new token</button
+              ><input
+                id="account-device-token"
+                type="password"
+                readonly
+                hidden
+                autocomplete="off"
+                aria-label="New upload token"
+              /><button
+                id="account-copy-token"
+                hidden
+                data-de="Token kopieren"
+                data-en="Copy token"
+              >
+                Copy token
+              </button>
+            </details>
           </details>
+          <div class="panel account-advanced account-danger">
+            <details>
+              <summary>
+                <span
+                  data-de="Konto und Beiträge löschen"
+                  data-en="Delete account and contributions"
+                  >Delete account and contributions</span
+                >
+              </summary>
+              <p
+                data-de="Entfernt dieses Konto und die Beiträge aller verknüpften Geräte. Alle zugehörigen Upload-Zugänge werden widerrufen. Lokale Dateien bleiben erhalten; Hinweise zu Backups stehen im Datenschutz."
+                data-en="Removes this account and contributions from all linked devices, and revokes their upload access. Local files remain; see the privacy notice for backups."
+              >
+                Removes this account and contributions from all linked devices,
+                and revokes their upload access. Local files remain; see the
+                privacy notice for backups.
+              </p>
+              <button
+                id="account-delete"
+                data-de="Konto und Beiträge endgültig löschen"
+                data-en="Permanently delete account and contributions"
+              >
+                Permanently delete account and contributions
+              </button>
+            </details>
+          </div>
         </section>
-        <details class="panel">
+        <details class="panel" id="existing-invite">
           <summary>
             <span
               data-en="Activate an existing invitation"

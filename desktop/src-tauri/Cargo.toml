@@ -22,3 +22,7 @@ serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 sha2 = "0.10"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Native StatusNotifier tooltips, including KDE/Wayland hover status.
+tray-icon = { version = "0.25", default-features = false, features = ["ksni"] }

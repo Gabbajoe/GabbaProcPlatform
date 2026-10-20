@@ -657,3 +657,122 @@ code {
     margin-top: 12px;
   }
 }
+
+/* Account overview keeps setup tools out of the signed-in view. */
+#header-account {
+  margin-left: auto;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#header-account + #language {
+  margin-left: 0;
+}
+#header-account.signed-in::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #82e0d3;
+}
+.account-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.account-overview h2 {
+  font-size: 25px;
+  margin: 8px 0 4px;
+}
+.account-overview p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.account-badge {
+  color: #82e0d3;
+  font-size: 12px;
+  font-weight: 650;
+}
+.account-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.account-grid h3 {
+  margin-top: 0;
+}
+#signed-account details {
+  max-width: none;
+  margin-top: 20px;
+}
+#signed-account summary {
+  color: var(--blue);
+}
+#signed-account small {
+  color: var(--muted);
+}
+.account-advanced {
+  max-width: none;
+}
+.account-danger {
+  margin-top: 20px;
+}
+.account-danger > details {
+  margin-top: 0 !important;
+}
+#account-login.embedded-login {
+  padding: 16px 0 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+}
+#account-login.embedded-login h2[hidden],
+#account-login p[hidden] {
+  display: none;
+}
+.identity-row,
+.device-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--edge);
+  overflow-wrap: anywhere;
+}
+.identity-provider {
+  color: var(--muted);
+  font-size: 12px;
+}
+#account-status:empty {
+  display: none;
+}
+@media (max-width: 1000px) {
+  .account-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
+@media (max-width: 600px) {
+  #header-account {
+    max-width: 14ch;
+  }
+  .masthead {
+    gap: 10px;
+  }
+  .account-overview {
+    align-items: start;
+  }
+  .account-overview h2 {
+    font-size: 20px;
+  }
+}

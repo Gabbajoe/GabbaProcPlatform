@@ -246,7 +246,8 @@ def test_pair_existing_preserves_token_and_delete_account(clients):
     result = b.post(
         "/api/device-link/poll", json={"deviceCode": pair["deviceCode"]}
     ).json()
-    assert result == {"status": "linked"}
+    assert result["status"] == "linked" and "token" not in result
+    assert len(result["deviceId"]) == 32
     assert a.delete("/api/account").status_code == 200
     assert a.get("/api/account").status_code == 401
     assert (
@@ -452,3 +453,125 @@ def test_email_html_link_and_plaintext(monkeypatch):
         "emailAddress": ["person@example.org"],
     }
     assert link in plain and "<img" not in html and "<script" not in html
+
+
+def test_profile_username_uniqueness_validation_and_deletion(clients):
+    a, b, sent = clients
+    assert a.put("/api/account/profile", json={"username": "Gabba"}).status_code == 401
+    signin(a, sent)
+    signin(b, sent, "two@example.org")
+    assert (
+        a.put("/api/account/profile", json={"username": "GabbaJoe"}).status_code == 200
+    )
+    assert a.get("/api/account").json()["username"] == "GabbaJoe"
+    assert (
+        b.put("/api/account/profile", json={"username": "gabbajoe"}).status_code == 409
+    )
+    assert (
+        a.put("/api/account/profile", json={"username": "Gabbajoe"}).status_code == 200
+    )
+    for name in ["a", "a" * 25, "<script>", " bad", "mail@example.org"]:
+        assert a.put("/api/account/profile", json={"username": name}).status_code == 400
+    assert (
+        a.put(
+            "/api/account/profile",
+            json={"username": "Changed"},
+            headers={"Origin": "https://other.example"},
+        ).status_code
+        == 403
+    )
+    assert a.delete("/api/account").status_code == 200
+    assert (
+        b.put("/api/account/profile", json={"username": "GabbaJoe"}).status_code == 200
+    )
+
+
+def test_disconnect_reconnect_keeps_device_and_rotates_token(clients):
+    import time, uuid
+    from server.config import postgres_enabled
+
+    a, b, sent = clients
+    signin(a, sent)
+    signin(b, sent, "two@example.org")
+    assert (
+        a.put("/api/account/profile", json={"username": "TestUser"}).status_code == 200
+    )
+    device = a.post("/api/account/devices").json()
+    old = {"Authorization": "Bearer " + device["token"]}
+    info = a.get("/api/device-account", headers=old).json()
+    assert info == {
+        "deviceId": device["id"],
+        "linked": True,
+        "username": "TestUser",
+        "expiresAt": None,
+    }
+    assert (
+        time.time() + 13 * 86400
+        < a.get("/api/account").json()["sessionExpiresAt"]
+        <= time.time() + 14 * 86400
+    )
+    payload = {
+        "schemaVersion": 1,
+        "addonVersion": "0.1.2",
+        "characterId": str(uuid.uuid4()),
+        "collectionId": str(uuid.uuid4()),
+        "sequence": 1,
+        "exportedAt": int(time.time()),
+        "privacy": "anonymous",
+        "historyTruncated": False,
+        "totals": [
+            {
+                "spellId": 20007,
+                "group": "world",
+                "procs": 1,
+                "combatProcs": 1,
+                "combatSeconds": 60,
+            }
+        ],
+        "segments": [],
+    }
+    assert a.post("/api/imports", headers=old, json=payload).status_code == 200
+    if postgres_enabled():
+        payload["sequence"] = 2
+        job = a.post("/api/upload-jobs", headers=old, json=payload).json()["jobId"]
+    assert a.post("/api/device-disconnect", headers=old).status_code == 200
+    assert a.get("/api/device-account", headers=old).status_code == 401
+    pair = a.post("/api/device-link/start", json={"deviceId": device["id"]}).json()
+    assert (
+        b.post(
+            "/api/device-link/approve", json={"userCode": pair["userCode"]}
+        ).status_code
+        == 403
+    )
+    assert (
+        a.post(
+            "/api/device-link/approve", json={"userCode": pair["userCode"]}
+        ).status_code
+        == 200
+    )
+    result = a.post(
+        "/api/device-link/poll", json={"deviceCode": pair["deviceCode"]}
+    ).json()
+    assert result["deviceId"] == device["id"] and result["reconnected"] is True
+    assert result["token"] != device["token"]
+    new = {"Authorization": "Bearer " + result["token"]}
+    assert a.get("/api/device-account", headers=old).status_code == 401
+    assert a.get("/api/device-account", headers=new).json()["username"] == "TestUser"
+    with connect() as db:
+        assert (
+            db.execute(
+                "SELECT device FROM owners WHERE character=?", (payload["characterId"],)
+            ).fetchone()[0]
+            == device["id"]
+        )
+    if postgres_enabled():
+        assert a.get("/api/upload-jobs/" + job, headers=new).status_code == 404
+        assert (
+            a.post("/api/upload-jobs", headers=new, json=payload).json()["status"]
+            == "queued"
+        )
+    else:
+        assert (
+            a.post("/api/imports", headers=new, json=payload).json()["status"]
+            == "duplicate"
+        )

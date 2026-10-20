@@ -453,7 +453,56 @@ def account_info(request: Request):
                 (aid,),
             )
         ]
-    return {"id": aid, "identities": identities, "devices": devices}
+        profile = db.execute(
+            "SELECT username FROM account_profiles WHERE account=?", (aid,)
+        ).fetchone()
+        browser_session = db.execute(
+            "SELECT expires FROM account_sessions WHERE hash=?",
+            (digest(request.cookies.get(COOKIE, "")),),
+        ).fetchone()
+    return {
+        "sessionExpiresAt": browser_session["expires"] if browser_session else None,
+        "id": aid,
+        "username": profile["username"] if profile else None,
+        "identities": identities,
+        "devices": devices,
+    }
+
+
+@router.put("/account/profile")
+async def profile_update(request: Request):
+    same_origin(request)
+    return await run_in_threadpool(save_profile, request, await data(request))
+
+
+def save_profile(request, body):
+    aid = session(request)
+    limited(request, "profile", 20)
+    name = body.get("username", "")
+    if not isinstance(name, str) or not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9_.-]{2,23}", name
+    ):
+        raise HTTPException(
+            400, "Use 3–24 letters, digits, dots, underscores or hyphens"
+        )
+    key = name.lower()
+    with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        lock(db, "account:" + aid)
+        if not db.execute("SELECT id FROM accounts WHERE id=?", (aid,)).fetchone():
+            raise HTTPException(401, "Account no longer exists")
+        lock(db, "username:" + key)
+        owner = db.execute(
+            "SELECT account FROM account_profiles WHERE username_key=?", (key,)
+        ).fetchone()
+        if owner and owner["account"] != aid:
+            raise HTTPException(409, "Username unavailable")
+        db.execute(
+            "INSERT INTO account_profiles VALUES(?,?,?) ON CONFLICT(account) DO UPDATE SET username=excluded.username,username_key=excluded.username_key",
+            (aid, name, key),
+        )
+        db.commit()
+    return {"username": name}
 
 
 @router.post("/auth/logout")
@@ -573,8 +622,46 @@ def delete_account(request: Request):
     return logout(request)
 
 
+@router.get("/device-account")
+def device_account(request: Request):
+    from .app import device
+
+    did = device(request, maximum=240, kind="device-account")
+    with connect() as db:
+        row = db.execute(
+            "SELECT a.account,p.username FROM account_devices a LEFT JOIN account_profiles p ON p.account=a.account WHERE a.device=?",
+            (did,),
+        ).fetchone()
+    return {
+        "deviceId": did,
+        "linked": bool(row),
+        "username": row["username"] if row else None,
+        "expiresAt": None,
+    }
+
+
+@router.post("/device-disconnect")
+def device_disconnect(request: Request):
+    from .app import device
+    from .upload_queue import cancel_jobs
+
+    did = device(request)
+    with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        lock(db, "device:" + did)
+        cancel_jobs(db, did)
+        db.execute("UPDATE devices SET revoked=1 WHERE id=?", (did,))
+        db.commit()
+    return {"status": "disconnected", "deviceId": did}
+
+
 @router.post("/device-link/start")
-def pair_start(request: Request):
+async def pair_start(request: Request):
+    payload = await data(request) if request.headers.get("content-type") else {}
+    return await run_in_threadpool(start_pair, request, payload)
+
+
+def start_pair(request, payload):
     require_enabled()
     limited(request, "pair-start", 10)
     cleanup()
@@ -583,6 +670,11 @@ def pair_start(request: Request):
         from .app import device
 
         did = device(request)
+    reconnect = payload.get("deviceId") if not did else None
+    if reconnect is not None and (
+        not isinstance(reconnect, str) or not re.fullmatch(r"[a-f0-9]{32}", reconnect)
+    ):
+        raise HTTPException(400, "Invalid device")
     code = secrets.token_urlsafe(32)
     user_code = secrets.token_hex(5).upper()
     with connect() as db:
@@ -590,6 +682,14 @@ def pair_start(request: Request):
             "INSERT INTO device_links VALUES(?,?,NULL,?,?)",
             (digest(code), user_code, did, int(time.time()) + 600),
         )
+        if reconnect:
+            if not db.execute(
+                "SELECT device FROM account_devices WHERE device=?", (reconnect,)
+            ).fetchone():
+                raise HTTPException(400, "Device cannot be reconnected")
+            db.execute(
+                "INSERT INTO device_reconnects VALUES(?,?)", (digest(code), reconnect)
+            )
     return {
         "deviceCode": code,
         "userCode": user_code,
@@ -621,6 +721,17 @@ def approve_pair(request, body):
         ).fetchone()
         if not row or row["account"]:
             raise HTTPException(400, "Code expired or already approved")
+        reconnect = db.execute(
+            "SELECT device FROM device_reconnects WHERE hash=?", (row["hash"],)
+        ).fetchone()
+        if (
+            reconnect
+            and not db.execute(
+                "SELECT device FROM account_devices WHERE device=? AND account=?",
+                (reconnect["device"], aid),
+            ).fetchone()
+        ):
+            raise HTTPException(403, "Device belongs to another account")
         if row["device"]:
             attach(db, aid, row["device"])
         db.execute("UPDATE device_links SET account=? WHERE hash=?", (aid, row["hash"]))
@@ -661,9 +772,35 @@ def poll_pair(request, body):
         ).fetchone()
         if not row:
             raise HTTPException(410, "Pairing expired; start again")
-        if row["device"]:
+        reconnect = db.execute(
+            "SELECT device FROM device_reconnects WHERE hash=?", (row["hash"],)
+        ).fetchone()
+        if reconnect:
+            did = reconnect["device"]
+            lock(db, "device:" + did)
+            if not db.execute(
+                "SELECT device FROM account_devices WHERE device=? AND account=?",
+                (did, row["account"]),
+            ).fetchone():
+                raise HTTPException(403, "Device belongs to another account")
+            token = secrets.token_urlsafe(32)
+            db.execute(
+                "UPDATE devices SET token_hash=?,revoked=0 WHERE id=?",
+                (digest(token), did),
+            )
+            # Old cancelled receipts must not prevent replay of retained local packets.
+            db.execute(
+                "DELETE FROM upload_jobs WHERE device=? AND status='cancelled'", (did,)
+            )
+            result = {
+                "status": "linked",
+                "token": token,
+                "reconnected": True,
+                "deviceId": did,
+            }
+        elif row["device"]:
             attach(db, row["account"], row["device"])
-            result = {"status": "linked"}
+            result = {"status": "linked", "deviceId": row["device"]}
         else:
             token, did = secrets.token_urlsafe(32), secrets.token_hex(16)
             db.execute(
@@ -671,7 +808,7 @@ def poll_pair(request, body):
                 (did, digest(token), int(time.time())),
             )
             attach(db, row["account"], did)
-            result = {"status": "linked", "token": token}
+            result = {"status": "linked", "token": token, "deviceId": did}
         db.execute("DELETE FROM device_links WHERE hash=?", (digest(code),))
         db.commit()
     return result

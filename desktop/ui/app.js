@@ -12,6 +12,10 @@ const de = {
   pairHelp:
     "Melde dich im Browser an und bestätige den hier angezeigten Gerätecode. Dein bestehender Upload-Zugang bleibt erhalten.",
   pairStart: "Mit Konto verbinden",
+  connected: "Verbunden",
+  disconnect: "Trennen",
+  connectionSettings: "Verbindung einrichten",
+  manualAccess: "Upload-Token manuell verwenden",
   pairCancel: "Verbindung abbrechen",
   tokenHelp:
     "Alternativ einen bestehenden Upload-Token einfügen oder auf der Website erstellen. Er wird im System-Schlüsselbund gespeichert, andernfalls nur für diese Sitzung.",
@@ -22,17 +26,18 @@ const de = {
   scan: "WoW suchen",
   folder: "WoW-Ordner auswählen",
   sync: "Synchronisieren",
-  auto: "Geänderte Exporte automatisch hochladen",
-  interval: "Upload-Intervall",
-  bandwidth: "Upload-Bandbreite",
+  auto: "Auto-Upload",
+  interval: "Intervall",
+  bandwidth: "Bandbreite",
   unlimited: "Unbegrenzt",
   localBuild:
     "Lokale Testversion: Uploads gehen nur an den lokalen Testserver.",
   quit: "App beenden",
+  closeToTray: "Beim Schließen in den Infobereich minimieren",
   startup: "Bei der Anmeldung starten",
   updates: "Signierte App-Updates automatisch installieren (App startet neu)",
   running:
-    "Beim Schließen läuft die App im Tray weiter. Über das Tray-Menü oder „App beenden“ wird sie vollständig beendet. Ohne verfügbares Tray beendet das Schließen die App. Frühere Kopien öffentlich sichtbarer Namen können nicht zurückgerufen werden.",
+    "Wenn aktiviert, wird das Fenster beim Schließen im Infobereich ausgeblendet. Ohne verfügbaren Infobereich beendet das Schließen die App.",
   upload: "Ausgewählte Charaktere hochladen",
   update: "Nach Updates suchen",
   preview: "Upload-Vorschau",
@@ -237,11 +242,62 @@ function renderProgress(s) {
         : text("Next check shortly…", "Nächste Prüfung folgt gleich …");
   }
 }
+let lastLinkedState;
+let nextAccountCheck = 0;
+let accountCheckRunning = false;
 function renderCredential(s) {
+  const linked = !!(s.accountLinked && s.hasToken);
+  $("accountConnected").hidden = !linked;
+  $("accountSetup").hidden = linked;
+  $("manualAccess").hidden = linked;
+  $("accountName").textContent =
+    s.accountUsername || text("GabbaProc account", "GabbaProc-Konto");
+  $("accountExpiry").textContent = s.accountExpiresAt
+    ? text("Access valid until ", "Zugang gültig bis ") +
+      new Date(s.accountExpiresAt * 1000).toLocaleString()
+    : text(
+        "No automatic expiry. Valid until disconnected or revoked.",
+        "Kein automatischer Ablauf. Gültig bis zum Trennen oder Widerrufen.",
+      );
+  $("accountStorage").textContent = s.persistentToken
+    ? text(
+        "Access saved in your system keyring.",
+        "Zugang im System-Schlüsselbund gespeichert.",
+      )
+    : text(
+        "Session only: reconnect after quitting the app.",
+        "Nur diese Sitzung: Nach dem Beenden erneut verbinden.",
+      );
+  $("disconnectAccount").disabled = !!s.busy;
+  if (lastLinkedState !== linked) {
+    lastLinkedState = linked;
+    $("accountSetup").open = !linked;
+    $("manualAccess").open = false;
+  }
+  if (
+    s.hasToken &&
+    !s.keyringLoading &&
+    !accountCheckRunning &&
+    Date.now() >= nextAccountCheck
+  ) {
+    nextAccountCheck = Date.now() + 60000;
+    accountCheckRunning = true;
+    invoke("refresh_account")
+      .catch(() => {})
+      .then(() => invoke("overview"))
+      .then(renderCredential)
+      .catch(() => {})
+      .finally(() => {
+        accountCheckRunning = false;
+      });
+  }
   $("connection").textContent = s.keyringLoading
     ? text("Loading access…", "Zugang wird geladen …")
     : s.hasToken
-      ? text("Upload access ready", "Upload-Zugang bereit")
+      ? linked
+        ? (s.accountUsername ? s.accountUsername + " · " : "") +
+          text("Connected", "Verbunden")
+        : text("Upload access ready", "Upload-Zugang bereit")
       : text("No upload access", "Kein Upload-Zugang");
   $("connection").dataset.ready = String(!!s.hasToken);
 
@@ -267,6 +323,7 @@ async function overview() {
     );
   }
   $("auto").checked = s.autoUpload;
+  $("closeToTray").checked = s.closeToTray !== false;
   $("interval").value = String(s.uploadIntervalMinutes || 15);
   $("bandwidth").value = String(s.uploadBandwidthKib || 0);
   renderCredential(s);
@@ -367,25 +424,35 @@ async function scan() {
         ),
       ),
     );
+    let savedChoice = { enabled: enabled.checked, named: named.checked };
     async function choose() {
-      await invoke("set_choice", {
-        id: row.id,
-        enabled: enabled.checked,
-        named: named.checked,
-      });
+      enabled.disabled = named.disabled = true;
+      try {
+        await invoke("set_choice", { id: row.id, enabled: enabled.checked, named: named.checked });
+        savedChoice = { enabled: enabled.checked, named: named.checked };
+      } catch (error) {
+        enabled.checked = savedChoice.enabled;
+        named.checked = savedChoice.named;
+        throw error;
+      } finally {
+        enabled.disabled = named.disabled = false;
+      }
     }
     enabled.onchange = named.onchange = () => run(choose);
     const preview = document.createElement("button");
     preview.textContent = text("Preview", "Vorschau");
+    const previewPanel = document.createElement("details");
+    previewPanel.className = "character-preview";
+    previewPanel.hidden = true;
+    const previewTitle = document.createElement("summary");
+    previewTitle.textContent = text("Upload preview", "Upload-Vorschau");
+    const previewData = document.createElement("pre");
+    previewPanel.append(previewTitle, previewData);
     preview.onclick = () =>
       run(async () => {
-        $("preview").textContent = JSON.stringify(
-          await invoke("preview", { id: row.id }),
-          null,
-          2,
-        );
-        $("preview").parentElement.open = true;
-        showTab("sync");
+        previewData.textContent = JSON.stringify(await invoke("preview", { id: row.id }), null, 2);
+        previewPanel.hidden = false;
+        previewPanel.open = true;
       });
     const hide = document.createElement("button");
     hide.textContent = text(
@@ -403,7 +470,7 @@ async function scan() {
           ),
         );
       });
-    box.append(label, label2, preview, hide);
+    box.append(label, label2, preview, hide, previewPanel);
     group.append(box);
   }
   if (!rows.length)
@@ -598,6 +665,7 @@ $("pairStart").onclick = async () => {
           "Account connected. Upload selection remains unchanged.",
           "Konto verbunden. Deine Upload-Auswahl bleibt erhalten.",
         );
+        nextAccountCheck = 0;
         await overview();
         return;
       }
@@ -631,3 +699,28 @@ $("pairCancel").onclick = async () => {
     "Verbindung abgebrochen.",
   );
 };
+
+$("disconnectAccount").onclick = () =>
+  run(async () => {
+    if (
+      !confirm(
+        text(
+          "Disconnect this app and stop uploads? Your uploaded data stays in your account.",
+          "Diese App trennen und Uploads stoppen? Hochgeladene Daten bleiben in deinem Konto.",
+        ),
+      )
+    )
+      return;
+    await invoke("disconnect_account");
+    nextAccountCheck = 0;
+    $("pairStatus").textContent = text(
+      "Disconnected. Connect again to resume.",
+      "Getrennt. Zum Fortsetzen erneut verbinden.",
+    );
+    await overview();
+  });
+
+$("closeToTray").onchange = () => run(() => invoke("set_close_to_tray", { enabled: $("closeToTray").checked }));
+for (const [id, destination] of [["sourceLink", "source"], ["websiteLink", "website"]]) {
+  $(id).onclick = (event) => { event.preventDefault(); run(() => invoke("open_public_link", { destination })); };
+}

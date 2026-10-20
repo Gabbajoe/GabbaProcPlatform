@@ -23,11 +23,17 @@ struct Config {
     roots: Vec<PathBuf>,
     choices: BTreeMap<String, Choice>,
     auto_upload: bool,
+    close_to_tray: Option<bool>,
+    language: String,
     #[serde(default = "default_interval")]
     upload_interval_minutes: u64,
     upload_bandwidth_kib: u64,
     token_digest: Option<String>,
     account_linked: bool,
+    account_username: Option<String>,
+    account_device: Option<String>,
+    account_expires: Option<u64>,
+    reconnect_digest: Option<String>,
     acks: BTreeMap<String, String>,
 }
 fn default_interval() -> u64 {
@@ -128,7 +134,7 @@ fn response(r: std::result::Result<reqwest::blocking::Response, reqwest::Error>)
 #[tauri::command]
 fn overview(state: State<AppState>, app: tauri::AppHandle) -> Value {
     let s = state.0.lock().unwrap();
-    json!({"version":app.package_info().version.to_string(),"localBuild":cfg!(any(debug_assertions, feature = "local-test")),"autoUpload":s.config.auto_upload,"uploadIntervalMinutes":s.config.upload_interval_minutes,"uploadBandwidthKib":s.config.upload_bandwidth_kib,"hasToken":s.token.is_some(),"accountLinked":s.config.account_linked,"persistentToken":s.persistent,"keyringLoading":s.keyring_loading,"busy":s.busy,"status":s.status,"progress":s.progress,"finishingUpload":s.manual_drain})
+    json!({"version":app.package_info().version.to_string(),"localBuild":cfg!(any(debug_assertions, feature = "local-test")),"autoUpload":s.config.auto_upload,"closeToTray":s.config.close_to_tray.unwrap_or(true),"uploadIntervalMinutes":s.config.upload_interval_minutes,"uploadBandwidthKib":s.config.upload_bandwidth_kib,"hasToken":s.token.is_some(),"accountLinked":s.config.account_linked,"accountUsername":s.config.account_username,"accountExpiresAt":s.config.account_expires,"persistentToken":s.persistent,"keyringLoading":s.keyring_loading,"busy":s.busy,"status":s.status,"progress":s.progress,"finishingUpload":s.manual_drain})
 }
 #[tauri::command]
 async fn discover(state: State<'_, AppState>) -> Result<Value> {
@@ -266,6 +272,51 @@ fn restart_after_update(version: String, app: tauri::AppHandle) -> Result<()> {
     Ok(())
 }
 
+#[tauri::command]
+fn set_close_to_tray(enabled: bool, state: State<AppState>) -> Result<()> {
+    let mut s = state.0.lock().unwrap();
+    s.config.close_to_tray = Some(enabled);
+    save(&s)
+}
+#[tauri::command]
+fn open_public_link(destination: String) -> Result<()> {
+    let url = match destination.as_str() {
+        "source" => "https://github.com/Gabbajoe/GabbaProcPlatform",
+        "website" => "https://gabbaproc.kellerkind.info/",
+        _ => return Err("Unknown destination".into()),
+    };
+    #[cfg(target_os = "linux")]
+    let result = std::process::Command::new("xdg-open").arg(url).spawn();
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("open").arg(url).spawn();
+    #[cfg(target_os = "windows")]
+    let result = std::process::Command::new("rundll32.exe").args(["url.dll,FileProtocolHandler", url]).spawn();
+    result.map(|_| ()).map_err(|_| "Cannot open browser".into())
+}
+fn tray_status(s: &Inner) -> String {
+    let de = s.config.language == "de";
+    let connection = if s.token.is_some() {
+        if s.config.account_linked {
+            format!("{} · {}", s.config.account_username.as_deref().unwrap_or("GabbaProc"), if de { "Verbunden" } else { "Connected" })
+        } else { if de { "Upload-Zugang bereit" } else { "Upload access ready" }.into() }
+    } else { if de { "Nicht verbunden" } else { "Not connected" }.into() };
+    let sync = if s.busy {
+        if de { "Synchronisierung läuft" } else { "Synchronizing" }.into()
+    } else if s.token.is_none() {
+        if de { "Upload wartet auf Anmeldung" } else { "Upload waiting for sign-in" }.into()
+    } else if s.manual_drain {
+        if de { "Warte auf Serverbestätigung" } else { "Waiting for server confirmation" }.into()
+    } else if !s.config.auto_upload {
+        if de { "Auto-Upload aus" } else { "Auto-upload off" }.into()
+    } else if !s.config.choices.values().any(|c| c.enabled) {
+        if de { "Keine Charaktere ausgewählt" } else { "No characters selected" }.into()
+    } else {
+        let seconds = (s.config.upload_interval_minutes * 60).saturating_sub(s.last_auto_attempt.map(|last| last.elapsed().as_secs()).unwrap_or(u64::MAX));
+        let minutes = seconds.div_ceil(60);
+        if de { format!("Nächster Upload-Check in {minutes} Min.") } else { format!("Next upload check in {minutes} min") }
+    };
+    format!("{connection}\n{sync}")
+}
 fn tray_menu(app: &tauri::AppHandle, german: bool) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
     use tauri::menu::{Menu, MenuItem};
     let open = MenuItem::with_id(
@@ -282,10 +333,13 @@ fn tray_menu(app: &tauri::AppHandle, german: bool) -> tauri::Result<tauri::menu:
         true,
         None::<&str>,
     )?;
-    Menu::with_items(app, &[&open, &quit])
+    let status = tray_status(&app.state::<AppState>().0.lock().unwrap());
+    let info = MenuItem::with_id(app, "status", status.replace('\n', " · "), false, None::<&str>)?;
+    Menu::with_items(app, &[&info, &open, &quit])
 }
 #[tauri::command]
 fn set_language(language: String, app: tauri::AppHandle) -> Result<()> {
+    { let state = app.state::<AppState>(); let mut s = state.0.lock().unwrap(); s.config.language = language.clone(); save(&s)?; }
     if let Some(tray) = app.tray_by_id("main") {
         tray.set_menu(Some(
             tray_menu(&app, language == "de").map_err(|e| e.to_string())?,
@@ -344,11 +398,111 @@ fn set_token(token: String, state: State<AppState>) -> Result<bool> {
         .is_ok();
     s.keyring_loading = false;
     s.config.account_linked = false;
+    s.config.account_username = None;
+    s.config.account_device = None;
+    s.config.reconnect_digest = None;
     s.config.token_digest = Some(format!("{:x}", Sha256::digest(token.as_bytes())));
     s.token = Some(token);
     s.config.acks.clear();
     save(&s)?;
     Ok(s.persistent)
+}
+
+fn clear_account_access(s: &mut Inner) {
+    if let Ok(entry) = key() {
+        let _ = entry.delete_credential();
+    }
+    if s.config.token_digest.is_some() {
+        s.config.reconnect_digest = s.config.token_digest.take();
+    }
+    s.token = None;
+    s.persistent = false;
+    s.keyring_loading = false;
+    s.config.account_linked = false;
+    s.config.account_expires = None;
+    s.config.auto_upload = false;
+    s.manual_drain = false;
+}
+
+#[tauri::command]
+async fn refresh_account(state: State<'_, AppState>) -> Result<()> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let token = state
+            .0
+            .lock()
+            .unwrap()
+            .token
+            .clone()
+            .ok_or("No upload access")?;
+        let reply = client()?
+            .get(format!("{}/device-account", api_base()))
+            .bearer_auth(&token)
+            .send()
+            .map_err(|_| "Account service unavailable")?;
+        if reply.status().as_u16() == 401 {
+            let mut s = state.0.lock().unwrap();
+            if s.token.as_ref() == Some(&token) {
+                clear_account_access(&mut s);
+                save(&s)?;
+            }
+            return Err("Device access expired or revoked".into());
+        }
+        let result = response(Ok(reply))?;
+        let mut s = state.0.lock().unwrap();
+        if s.token.as_ref() != Some(&token) {
+            return Ok(());
+        }
+        let username = result["username"].as_str().map(str::to_string);
+        let device = result["deviceId"].as_str().map(str::to_string);
+        let linked = result["linked"].as_bool().unwrap_or(false);
+        let expires = result["expiresAt"].as_u64();
+        if s.config.account_username != username
+            || s.config.account_device != device
+            || s.config.account_linked != linked
+            || s.config.account_expires != expires
+        {
+            s.config.account_username = username;
+            s.config.account_device = device;
+            s.config.account_linked = linked;
+            s.config.account_expires = expires;
+            save(&s)?;
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|_| "Account refresh failed")?
+}
+
+#[tauri::command]
+async fn disconnect_account(state: State<'_, AppState>) -> Result<()> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let token = {
+            let mut s = state.0.lock().unwrap();
+            if s.busy {
+                return Err("Wait until the current upload finishes".into());
+            }
+            let token = s.token.clone().ok_or("No connection")?;
+            s.busy = true;
+            token
+        };
+        let result = client().and_then(|c| {
+            response(
+                c.post(format!("{}/device-disconnect", api_base()))
+                    .bearer_auth(&token)
+                    .send(),
+            )
+        });
+        let mut s = state.0.lock().unwrap();
+        s.busy = false;
+        let result = result?;
+        s.config.account_device = result["deviceId"].as_str().map(str::to_string);
+        clear_account_access(&mut s);
+        save(&s)
+    })
+    .await
+    .map_err(|_| "Disconnect failed")?
 }
 
 #[tauri::command]
@@ -371,6 +525,8 @@ async fn start_pairing(state: State<'_, AppState>, pairing: State<'_, Pairing>) 
         let mut request = client.post(format!("{}/device-link/start", api_base()));
         if let Some(t) = &token {
             request = request.bearer_auth(t);
+        } else if let Some(device) = &state.0.lock().unwrap().config.account_device {
+            request = request.json(&json!({"deviceId":device}));
         }
         let response = request.send().map_err(|_| "Account service unavailable")?;
         if !response.status().is_success() {
@@ -470,10 +626,29 @@ async fn poll_pairing(state: State<'_, AppState>, pairing: State<'_, Pairing>) -
             s.persistent = key()
                 .and_then(|k| k.set_password(&token).map_err(|_| "Keyring locked".into()))
                 .is_ok();
-            s.config.token_digest = Some(format!("{:x}", Sha256::digest(token.as_bytes())));
+            let new_digest = format!("{:x}", Sha256::digest(token.as_bytes()));
+            if result["reconnected"] == true {
+                if let Some(old_digest) = s
+                    .config
+                    .reconnect_digest
+                    .as_ref()
+                    .or(s.config.token_digest.as_ref())
+                {
+                    let base = s.config_file.parent().unwrap().join("outbox");
+                    let old = base.join(old_digest);
+                    let new = base.join(&new_digest);
+                    if old.exists() {
+                        fs::rename(old, new).map_err(|_| "Could not restore pending uploads")?;
+                    }
+                }
+            } else {
+                s.config.acks.clear();
+            }
+            s.config.reconnect_digest = None;
+            s.config.token_digest = Some(new_digest);
             s.token = Some(token);
-            s.config.acks.clear();
         }
+        s.config.account_device = result["deviceId"].as_str().map(str::to_string);
         s.config.account_linked = true;
         s.keyring_loading = false;
         save(&s)?;
@@ -901,6 +1076,9 @@ async fn delete_data(state: State<'_, AppState>) -> Result<()> {
         }
         i.token = None;
         i.config.account_linked = false;
+        i.config.account_username = None;
+        i.config.account_device = None;
+        i.config.reconnect_digest = None;
         i.config.token_digest = None;
         i.persistent = false;
         i.config.acks.clear();
@@ -1037,6 +1215,22 @@ pub fn run() {
                     eprintln!("Tray unavailable: {e}");
                 }
             }
+            let tray_app = app.handle().clone();
+            let tray_state = state.clone();
+            std::thread::spawn(move || {
+                let mut previous = String::new();
+                loop {
+                    let (status, de) = { let s = tray_state.0.lock().unwrap(); (tray_status(&s), s.config.language == "de") };
+                    if status != previous {
+                        if let Some(tray) = tray_app.tray_by_id("main") {
+                            let _ = tray.set_tooltip(Some(format!("GabbaProc Companion\n{status}")));
+                            if let Ok(menu) = tray_menu(&tray_app, de) { let _ = tray.set_menu(Some(menu)); }
+                        }
+                        previous = status;
+                    }
+                    std::thread::sleep(Duration::from_secs(5));
+                }
+            });
             std::thread::spawn(move || loop {
                 std::thread::sleep(Duration::from_secs(5));
                 let _ = sync_inner(&state, true);
@@ -1046,7 +1240,7 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.app_handle().tray_by_id("main").is_some() && window.hide().is_ok() {
+                if window.app_handle().state::<AppState>().0.lock().unwrap().config.close_to_tray.unwrap_or(true) && window.app_handle().tray_by_id("main").is_some() && window.hide().is_ok() {
                     api.prevent_close();
                 }
             }
@@ -1059,11 +1253,15 @@ pub fn run() {
             set_interval,
             set_bandwidth,
             set_language,
+            set_close_to_tray,
+            open_public_link,
             quit_app,
             restart_after_update,
             set_choice,
             preview,
             set_token,
+            refresh_account,
+            disconnect_account,
             start_pairing,
             poll_pairing,
             cancel_pairing,
@@ -1208,6 +1406,10 @@ mod transport_tests {
         assert_eq!(state.0.lock().unwrap().progress[id]["confirmed"], 1);
         assert_eq!(state.0.lock().unwrap().config.acks[id], "fingerprint");
         assert!(!queue_path.exists());
+        // A restart restores the same character selection and privacy choice.
+        let restored: Config = serde_json::from_slice(&fs::read(dir.join("preferences.json")).unwrap()).unwrap();
+        assert!(restored.choices[id].enabled);
+        assert!(!restored.choices[id].named);
         assert!(!state.0.lock().unwrap().manual_drain);
         assert_eq!(sync_inner(&state, true).unwrap()["status"], "idle");
         server.join().unwrap();

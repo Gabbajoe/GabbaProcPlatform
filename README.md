@@ -68,3 +68,9 @@ Releases are built in GitHub Actions for Windows, Linux, Apple Silicon and Intel
 Website und Companion sind deutsch/englisch. Die App sucht deinen WoW-Ordner, liest ausschließlich die Proc-Exporte und lädt nur gewählte Charaktere hoch. Automatischer Upload, Autostart und signierte Updates sind optional. Anonym heißt pseudonym: Die dauerhafte UUID erlaubt zusammenhängende Auswertungen. Charaktername und Realm werden nur auf ausdrücklichen Wunsch veröffentlicht.
 
 Ein Export im Addon plus `/reload` oder Ausloggen schreibt die Datei auf die Festplatte. Die App kann nicht auf noch ungespeicherte Daten im WoW-Prozess zugreifen. Die Anmeldung funktioniert mit Discord, GitHub oder E-Mail-Code. Bestehende Einladungen bleiben gültig. Messwerte sind Community-Beiträge und kein Beweis für unterschiedliche Proc-Chancen.
+
+### Account and companion controls
+
+Choose a username on the account page; the website and connected companion display it beside the language selector. Browser sessions last up to 14 days. Companion access has no automatic expiry and can be disconnected or revoked without deleting contributions. Reconnecting the same device preserves ownership and its local upload queue.
+
+Auto-upload, interval and bandwidth are in **Sync**. **Settings** contains autostart, updates and the option to minimize to the tray when closing (enabled by default). The tray reports connection and synchronization status, including the next automatic export check. Character previews open beneath the selected character. The bottom status bar stays visible across tabs. Click the logo/title to open the website, or the source link in the footer to open GitHub.

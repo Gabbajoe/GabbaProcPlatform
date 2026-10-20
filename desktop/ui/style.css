@@ -62,10 +62,13 @@ button {
 button {
   cursor: pointer;
   margin: 6px 6px 6px 0;
-  color: #7de0d0;
+  color: #edf5ff;
+  background: #213a55;
+  border-color: #466588;
 }
 button:hover {
-  border-color: #7de0d0;
+  background: #2a4c70;
+  border-color: #6ab3ff;
 }
 button:disabled {
   opacity: 0.5;
@@ -107,7 +110,7 @@ summary {
   cursor: pointer;
 }
 :focus-visible {
-  outline: 2px solid #f5c974;
+  outline: 2px solid #6ab3ff;
   outline-offset: 3px;
 }
 
@@ -325,3 +328,63 @@ footer {
     animation: none;
   }
 }
+
+#accountConnected h3 {
+  margin: 12px 0;
+  font-size: 24px;
+}
+.connection-badge {
+  color: #82e0d3;
+  font-weight: 600;
+  font-size: 13px;
+}
+.connection-badge::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+#accountSetup,
+#manualAccess {
+  border: 0;
+  border-top: 1px solid #2b3c55;
+  border-radius: 0;
+  padding: 18px 0 0;
+  margin: 18px 0 0;
+  background: transparent;
+}
+#accountStorage {
+  font-size: 13px;
+}
+#accountConnected[hidden],
+#accountSetup[hidden],
+#manualAccess[hidden] {
+  display: none;
+}
+
+.brand { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
+.brand:hover h1 { color: #6ab3ff; }
+.bottom-bar { flex-shrink: 0; border-top: 1px solid #344862; background: #101c2d; margin: 12px -24px -16px; padding: 10px 24px 12px; }
+.bottom-bar .global-status pre { margin: 0; min-height: 18px; }
+.bottom-bar a { color: #9ccaff; text-decoration: underline; text-underline-offset: 3px; }
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: #213a55;
+  color: #edf5ff;
+  border: 1px solid #466588;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23b4c4d9' stroke-width='2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+select:hover { background-color: #2a4c70; border-color: #6ab3ff; }
+select:focus { outline: 2px solid #6ab3ff; outline-offset: 2px; }
+select option { background: #172235; color: #edf5ff; }
+
+.sync-controls { display: flex; align-items: center; gap: 12px 24px; flex-wrap: wrap; margin: 8px 0 12px; }
+.sync-controls label { margin: 0; white-space: nowrap; }

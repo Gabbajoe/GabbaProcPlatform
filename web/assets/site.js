@@ -353,3 +353,33 @@ if ($("copy-token"))
   };
 translate();
 if ($("refresh")) refresh();
+
+// Account display is private browser state, never part of the public dataset.
+let headerAccount = null;
+const accountLink = document.createElement("a");
+accountLink.id = "header-account";
+accountLink.href = "/account.html";
+$("language").before(accountLink);
+function renderHeaderAccount() {
+  accountLink.textContent =
+    headerAccount?.username ||
+    (headerAccount ? t("My account", "Mein Konto") : t("Sign in", "Anmelden"));
+  accountLink.classList.toggle("signed-in", !!headerAccount);
+}
+window.addEventListener("gabbaproc-account", (event) => {
+  headerAccount = event.detail;
+  renderHeaderAccount();
+});
+new MutationObserver(renderHeaderAccount).observe(document.documentElement, {
+  attributes: true,
+  attributeFilter: ["lang"],
+});
+renderHeaderAccount();
+if (!$("account-login"))
+  fetch("/api/account")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((account) => {
+      headerAccount = account;
+      renderHeaderAccount();
+    })
+    .catch(() => {});
