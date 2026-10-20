@@ -200,3 +200,90 @@ summary {
     transition: none;
   }
 }
+
+/* Keep navigation visible; only the selected panel scrolls. */
+* {
+  box-sizing: border-box;
+}
+[hidden] {
+  display: none !important;
+}
+body {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px 24px;
+}
+header {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+header img {
+  width: 44px;
+  height: 44px;
+}
+header h1 {
+  font-size: 20px;
+}
+header p {
+  display: none;
+}
+header select {
+  margin-left: 0;
+}
+.connection {
+  margin-left: auto;
+  font-size: 12px;
+  color: #b4c4d9;
+  max-width: 150px;
+}
+.connection[data-ready="true"] {
+  color: #7de0d0;
+}
+.tabs {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  border-bottom: 1px solid #2b3c55;
+  margin-bottom: 12px;
+}
+.tabs button {
+  flex: 1;
+  margin: 0 0 8px;
+  color: #b4c4d9;
+}
+.tabs button[aria-selected="true"] {
+  background: #203b5c;
+  border-color: #6ab3ff;
+  color: #e7edf7;
+}
+button:focus-visible {
+  outline: 2px solid #6ab3ff;
+  outline-offset: 2px;
+}
+main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.global-status {
+  flex-shrink: 0;
+}
+.global-status pre {
+  max-height: 65px;
+  margin: 6px 0;
+}
+footer {
+  flex-shrink: 0;
+  padding: 8px 0 0;
+  margin: 0;
+  font-size: 11px;
+}
+#localBuild {
+  flex-shrink: 0;
+  margin: 0 0 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+}

@@ -95,3 +95,9 @@ Both percentages count packets, not bytes. The progress heading uses the locally
 discovered character name and realm; these labels do not change upload privacy.
 A badge shows whether the queued payload is anonymous or includes name and realm.
 The existing sequential transport and confirmation polling interval are unchanged.
+
+The companion uses Characters, Sync, Account and Settings tabs with keyboard
+navigation. Only the active panel scrolls; navigation stays visible. The header
+reports whether upload credentials are loaded, not whether the server is online.
+On first launch the UI follows the system language (German, otherwise English).
+An explicit language selection is retained across restarts.

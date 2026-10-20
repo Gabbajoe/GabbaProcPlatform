@@ -2,17 +2,22 @@
 const { invoke } = window.__TAURI__.core;
 const $ = (id) => document.getElementById(id);
 const de = {
+  tabcharacters: "Charaktere",
+  tabsync: "Sync",
+  tabaccount: "Account",
+  tabsettings: "Einstellungen",
+  settings: "Einstellungen",
   tag: "Kleine App. Gemeinsame Erkenntnisse.",
-  connect: "1 · Verbinden",
+  connect: "Account",
   tokenHelp:
     "Mit einer Einladung des Betreibers erhältst du auf gabbaproc.kellerkind.info einen Upload-Token. Er wird im System-Schlüsselbund gespeichert, andernfalls nur für diese Sitzung.",
   token: "Upload-Token",
   save: "Token speichern",
-  characters: "2 · Charaktere auswählen",
+  characters: "Charaktere auswählen",
   help: "Im Addon exportieren (/gpt export), danach /reload oder ausloggen. Nur ausgewählte Charaktere werden hochgeladen. Anonyme Uploads nutzen eine dauerhafte pseudonyme ID.",
   scan: "WoW suchen",
   folder: "WoW-Ordner auswählen",
-  sync: "3 · Synchronisieren",
+  sync: "Synchronisieren",
   auto: "Geänderte Exporte automatisch hochladen",
   interval: "Upload-Intervall",
   bandwidth: "Upload-Bandbreite",
@@ -36,9 +41,14 @@ const de = {
 const original = new Map(
   [...document.querySelectorAll("[data-t]")].map((el) => [el, el.textContent]),
 );
-let lang =
-  localStorage.getItem("language") ||
-  (navigator.language.startsWith("de") ? "de" : "en");
+const savedLanguage = localStorage.getItem("language");
+let lang = ["de", "en"].includes(savedLanguage)
+  ? savedLanguage
+  : (navigator.languages?.[0] || navigator.language || "en")
+        .toLowerCase()
+        .startsWith("de")
+    ? "de"
+    : "en";
 function text(en, ger) {
   return lang === "de" ? ger : en;
 }
@@ -215,6 +225,13 @@ function renderProgress(s) {
   }
 }
 function renderCredential(s) {
+  $("connection").textContent = s.keyringLoading
+    ? text("Loading access…", "Zugang wird geladen …")
+    : s.hasToken
+      ? text("Upload access ready", "Upload-Zugang bereit")
+      : text("No upload access", "Kein Upload-Zugang");
+  $("connection").dataset.ready = String(!!s.hasToken);
+
   $("credential").textContent = s.keyringLoading
     ? text("Loading saved token…", "Gespeicherter Token wird geladen …")
     : s.hasToken
@@ -355,6 +372,7 @@ async function scan() {
           2,
         );
         $("preview").parentElement.open = true;
+        showTab("sync");
       });
     const hide = document.createElement("button");
     hide.textContent = text(
@@ -380,6 +398,35 @@ async function scan() {
       "No exports found. Choose your WoW folder and export in the addon.",
       "Keine Exporte gefunden. WoW-Ordner wählen und im Addon exportieren.",
     );
+}
+function showTab(key) {
+  for (const button of document.querySelectorAll("[data-tab]")) {
+    const selected = button.dataset.tab === key;
+    button.setAttribute("aria-selected", String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    $(button.getAttribute("aria-controls")).hidden = !selected;
+  }
+  document.querySelector("main").scrollTop = 0;
+}
+const tabs = [...document.querySelectorAll("[data-tab]")];
+for (const [index, button] of tabs.entries()) {
+  button.onclick = () => showTab(button.dataset.tab);
+  button.onkeydown = (event) => {
+    const next =
+      event.key === "ArrowRight"
+        ? (index + 1) % tabs.length
+        : event.key === "ArrowLeft"
+          ? (index + tabs.length - 1) % tabs.length
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? tabs.length - 1
+              : -1;
+    if (next < 0) return;
+    event.preventDefault();
+    showTab(tabs[next].dataset.tab);
+    tabs[next].focus();
+  };
 }
 $("lang").onchange = () => {
   lang = $("lang").value;
