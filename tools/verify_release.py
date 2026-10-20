@@ -33,8 +33,19 @@ config = json.loads(
 manifest = json.loads((root / "latest.json").read_text())
 require(manifest["version"].removeprefix("v") == config["version"], "Version mismatch")
 platforms = manifest["platforms"]
-required = {"darwin-aarch64", "darwin-x86_64", "windows-x86_64", "linux-x86_64"}
-require(required <= platforms.keys(), "Missing operating system or architecture")
+required = {
+    "darwin-aarch64",
+    "darwin-x86_64",
+    "windows-x86_64",
+    "linux-x86_64",
+    "linux-x86_64-appimage",
+    "linux-x86_64-deb",
+    "linux-x86_64-rpm",
+}
+require(
+    required <= platforms.keys(),
+    "Missing operating system, architecture or Linux package format",
+)
 require(len(platforms) <= 20, "Unexpected manifest size")
 verified = {}
 with tempfile.TemporaryDirectory() as temp:
@@ -42,7 +53,7 @@ with tempfile.TemporaryDirectory() as temp:
     public.write_bytes(
         base64.b64decode(config["plugins"]["updater"]["pubkey"], validate=True)
     )
-    for platform, item in platforms.items():
+    for item in platforms.values():
         url = urlsplit(item["url"])
         prefix = (
             "/Gabbajoe/GabbaProcPlatform/releases/download/v" + config["version"] + "/"
