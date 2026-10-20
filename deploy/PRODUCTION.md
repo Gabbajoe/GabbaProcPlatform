@@ -5,7 +5,7 @@ CurseForge addon installation link is next to the companion download. These are
 separate tools: the addon collects measurements, the companion uploads exports.
 
 The deployment uses the compose definition with private host configuration and
-an image override (currently `gabbaproc:accounts-mail-20261021`) and
+an image override (currently `gabbaproc:accounts-mail-en-20261021`) and
 `compose.accounts.yaml` for individual read-only account-secret mounts. PostgreSQL has no public port. Only the
 API is published on loopback port 8757 for the existing Froxlor Apache proxy.
 Every persistent mount is a host bind; no Docker-managed data volumes are used.
