@@ -2,7 +2,8 @@
 
 Production cutover completed on 2026-10-20. The live website and API now use
 PostgreSQL with a separate upload worker and host bind mounts. Desktop 0.1.2 is
-being built as a release draft; account login remains unavailable.
+published for all platforms; account login remains unavailable. All updater
+signatures were verified and the public latest.json matches the verified manifest.
 
 Live validation: all five portal pages, DE/EN switching and the CurseForge link;
 HTTPS invite enrollment, two archive packets with retained fights, idempotent
@@ -54,7 +55,7 @@ The local AppImage uses an optimized build with the explicit `local-test` featur
 ## Remaining validation and follow-up
 
 1. Validate the new bounded archive batches and late backfill under representative
-   concurrent load and interruptions. The published client still uses schema 1.
+   concurrent load and interruptions. Desktop 0.1.2 supports schema 2 archive batches.
 2. Validate the new companion outbox on Windows/macOS and in real WoW usage;
    define operator recovery for blocked jobs and long-running archive limits.
 3. Complete account, identity, session, device-pairing and email-login code.
@@ -69,4 +70,4 @@ The addon branch adds opt-in zone snapshots and a full local combat archive,
 including collections retained through reset. The UI and legacy export retain
 their 300-entry view. Archive memory/file growth and companion support still
 need further real-client validation. Zone export changes SavedVariables in memory; WoW writes the file
-only on reload/logout. No new addon or companion release was published here.
+only on reload/logout. Companion 0.1.2 is published; the archive addon remains a development build.

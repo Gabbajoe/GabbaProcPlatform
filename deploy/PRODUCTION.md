@@ -45,6 +45,6 @@ extended through 2026-10-31 23:59:59 Europe/Berlin and remain single-use.
 Activation is on `/account.html`.
 The operator CLI's initialization step should run only with migration credentials.
 
-Desktop 0.1.2 must be published only after all platform artifacts and updater
-signatures have been verified. Local `local-test` builds continue using their
+Desktop 0.1.2 was published after all platform artifacts and updater
+signatures were verified. The public latest.json matches the verified manifest. Local `local-test` builds continue using their
 separate localhost API and do not turn into production clients automatically.
