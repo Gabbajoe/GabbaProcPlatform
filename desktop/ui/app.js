@@ -75,8 +75,131 @@ async function run(f) {
     status(String(e));
   }
 }
+let progressSignature = "";
+function renderProgress(s) {
+  const entries = Object.entries(s.progress || {});
+  const signature = JSON.stringify([
+    lang,
+    s.progress,
+    s.busy,
+    s.autoUpload,
+    s.finishingUpload,
+  ]);
+  const container = $("uploadProgress");
+  container.hidden = entries.length === 0;
+  if (signature !== progressSignature) {
+    progressSignature = signature;
+    container.replaceChildren();
+    for (const [id, p] of entries) {
+      const paused =
+        !s.busy &&
+        !s.autoUpload &&
+        !s.finishingUpload &&
+        ["ready", "waiting", "retry", "sending", "checking"].includes(p.phase);
+      const phase = paused ? "paused" : p.phase;
+      const labels = {
+        preparing: text("Preparing archive…", "Archiv wird vorbereitet …"),
+        ready: text("Next packet is ready", "Nächstes Paket ist bereit"),
+        sending: text(
+          `Sending packet ${p.confirmed + 1} of ${p.total}…`,
+          `Paket ${p.confirmed + 1} von ${p.total} wird gesendet …`,
+        ),
+        checking: text(
+          "Checking server confirmation…",
+          "Serverbestätigung wird geprüft …",
+        ),
+        waiting: text(
+          "Received by server · waiting for processing confirmation",
+          "Beim Server eingegangen · warte auf Verarbeitungsbestätigung",
+        ),
+        retry: text(
+          "Connection delayed · data stays saved locally",
+          "Übertragung verzögert · Daten bleiben lokal gespeichert",
+        ),
+        blocked: text(
+          "Server could not process this upload · data retained",
+          "Server konnte den Upload nicht verarbeiten · Daten bleiben gespeichert",
+        ),
+        error: text(
+          "Upload interrupted · see details below",
+          "Upload unterbrochen · Details stehen unten",
+        ),
+        complete: text(
+          "Upload complete · confirmed by server",
+          "Upload abgeschlossen · vom Server bestätigt",
+        ),
+        unchanged: text(
+          "Already synchronized · no new data",
+          "Bereits synchronisiert · keine neuen Daten",
+        ),
+        paused: text(
+          "Upload paused · click Upload to resume",
+          "Upload pausiert · mit Upload fortsetzen",
+        ),
+      };
+      const row = document.createElement("div");
+      row.className = "upload-progress-row";
+      row.dataset.phase = phase;
+      const heading = document.createElement("strong");
+      heading.textContent =
+        entries.length === 1
+          ? text("Upload progress", "Upload-Fortschritt")
+          : text(`Character ${id.slice(0, 8)}`, `Charakter ${id.slice(0, 8)}`);
+      const label = document.createElement("p");
+      label.className = "progress-phase";
+      label.setAttribute("role", "status");
+      label.textContent = labels[phase] || phase;
+      row.append(heading, label);
+      if (p.total > 0) {
+        const bar = document.createElement("progress");
+        bar.max = p.total;
+        bar.value = Math.min(p.confirmed, p.total);
+        bar.setAttribute(
+          "aria-label",
+          text("Packets confirmed by server", "Vom Server bestätigte Pakete"),
+        );
+        const count = document.createElement("span");
+        count.className = "progress-count";
+        const percent = Math.floor(
+          (100 * Math.min(p.confirmed, p.total)) / p.total,
+        );
+        count.textContent = text(
+          `${p.confirmed} / ${p.total} packets confirmed · ${percent}%`,
+          `${p.confirmed} / ${p.total} Pakete bestätigt · ${percent}%`,
+        );
+        row.append(bar, count);
+      } else if (phase === "preparing") {
+        const bar = document.createElement("progress");
+        bar.setAttribute("aria-label", labels.preparing);
+        row.append(bar);
+      }
+      if (["waiting", "retry", "ready"].includes(phase) && p.nextCheck) {
+        const countdown = document.createElement("small");
+        countdown.className = "progress-countdown";
+        countdown.dataset.deadline = p.nextCheck;
+        countdown.setAttribute("aria-live", "off");
+        row.append(countdown);
+      }
+      container.append(row);
+    }
+  }
+  for (const el of container.querySelectorAll("[data-deadline]")) {
+    const seconds = Math.max(
+      0,
+      Math.ceil(Number(el.dataset.deadline) - Date.now() / 1000),
+    );
+    el.textContent =
+      seconds > 0
+        ? text(
+            `Next check in about ${seconds}s`,
+            `Nächste Prüfung in etwa ${seconds} s`,
+          )
+        : text("Next check shortly…", "Nächste Prüfung folgt gleich …");
+  }
+}
 async function overview() {
   const s = await invoke("overview");
+  renderProgress(s);
   if (s.version) $("appVersion").textContent = s.version;
   if (s.localBuild) {
     $("localBuild").hidden = false;
@@ -339,10 +462,11 @@ run(async () => {
 setInterval(
   () =>
     run(async () => {
-      const s = await overview();
+      const s = await invoke("overview");
+      renderProgress(s);
       if (s.status && !s.busy) status(s.status);
     }),
-  10000,
+  1000,
 );
 setInterval(
   () => {

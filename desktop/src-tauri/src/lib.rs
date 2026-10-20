@@ -41,6 +41,7 @@ struct Inner {
     last_queue_attempt: Option<Instant>,
     manual_drain: bool,
     status: String,
+    progress: BTreeMap<String, Value>,
     files: BTreeMap<String, PathBuf>,
     config_file: PathBuf,
 }
@@ -121,7 +122,7 @@ fn response(r: std::result::Result<reqwest::blocking::Response, reqwest::Error>)
 #[tauri::command]
 fn overview(state: State<AppState>, app: tauri::AppHandle) -> Value {
     let s = state.0.lock().unwrap();
-    json!({"version":app.package_info().version.to_string(),"localBuild":cfg!(debug_assertions),"autoUpload":s.config.auto_upload,"uploadIntervalMinutes":s.config.upload_interval_minutes,"uploadBandwidthKib":s.config.upload_bandwidth_kib,"hasToken":s.token.is_some(),"persistentToken":s.persistent,"busy":s.busy,"status":s.status})
+    json!({"version":app.package_info().version.to_string(),"localBuild":cfg!(debug_assertions),"autoUpload":s.config.auto_upload,"uploadIntervalMinutes":s.config.upload_interval_minutes,"uploadBandwidthKib":s.config.upload_bandwidth_kib,"hasToken":s.token.is_some(),"persistentToken":s.persistent,"busy":s.busy,"status":s.status,"progress":s.progress,"finishingUpload":s.manual_drain})
 }
 #[tauri::command]
 fn discover(state: State<AppState>) -> Result<Value> {
@@ -332,6 +333,25 @@ fn outbox_path(s: &Inner, token: &str, id: &str) -> PathBuf {
         .join(format!("{:x}", Sha256::digest(token.as_bytes())))
         .join(format!("{:x}.json", Sha256::digest(id.as_bytes())))
 }
+fn upload_progress(
+    state: &AppState,
+    id: &str,
+    phase: &str,
+    confirmed: usize,
+    total: usize,
+    next_check: u64,
+) {
+    state.0.lock().unwrap().progress.insert(
+        id.to_string(),
+        json!({"phase":phase,"confirmed":confirmed,"total":total,"nextCheck":next_check}),
+    );
+}
+fn epoch_seconds() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
 fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
     let (token, jobs, bandwidth) = {
         let mut s = state.0.lock().unwrap();
@@ -370,6 +390,9 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
             })
             .filter(|(_, _, _, _, queue_path)| fresh || queue_path.exists())
             .collect();
+        if fresh && (!automatic || !s.manual_drain) {
+            s.progress.clear();
+        }
         s.busy = true;
         if !automatic {
             s.manual_drain = true;
@@ -384,6 +407,7 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
         let mut sent_packets = 0;
         for (id, path, named, ack, queue_path) in jobs {
             let attempt: Result<bool> = (|| {
+                upload_progress(state, &id, "preparing", 0, 0, 0);
                 let mut queue = match gabbaproc_core::outbox::Outbox::load(&queue_path)? {
                     Some(queue) => queue,
                     None => {
@@ -397,6 +421,7 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                             Sha256::digest(serde_json::to_vec(&packets).unwrap())
                         );
                         if ack.as_deref() == Some(&hash) {
+                            upload_progress(state, &id, "unchanged", 0, 0, 0);
                             return Ok(false);
                         }
                         let queue = gabbaproc_core::outbox::Outbox::new(hash, packets, named);
@@ -404,6 +429,14 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                         queue
                     }
                 };
+                upload_progress(
+                    state,
+                    &id,
+                    "ready",
+                    queue.cursor,
+                    queue.packets.len(),
+                    epoch_seconds() + 30,
+                );
                 // An opt-out applies before resuming any previously named queue.
                 if queue.named && !named {
                     let r = client
@@ -432,6 +465,7 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                     queue.save(&queue_path)?;
                 }
                 if let Some(reason) = &queue.blocked {
+                    upload_progress(state, &id, "blocked", queue.cursor, queue.packets.len(), 0);
                     return Err(format!("Upload {reason}; local queue retained"));
                 }
                 let now = std::time::SystemTime::now()
@@ -439,6 +473,14 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                     .unwrap_or_default()
                     .as_secs();
                 if queue.retry_at > now {
+                    upload_progress(
+                        state,
+                        &id,
+                        "retry",
+                        queue.cursor,
+                        queue.packets.len(),
+                        queue.retry_at,
+                    );
                     pending += queue.packets.len() - queue.cursor;
                     return Ok(false);
                 }
@@ -446,6 +488,14 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                     let mut retry_after = 0;
                     let transfer: Result<Value> = (|| {
                         let response_result = if let Some(job) = &queue.job_id {
+                            upload_progress(
+                                state,
+                                &id,
+                                "checking",
+                                queue.cursor,
+                                queue.packets.len(),
+                                0,
+                            );
                             let r = client
                                 .get(format!("{}/upload-jobs/{job}", api_base()))
                                 .bearer_auth(&token)
@@ -461,6 +511,14 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                                 .map_err(|_| "Cannot encode packet")?;
                             let len = bytes.len() as u64;
                             sent_packets += 1;
+                            upload_progress(
+                                state,
+                                &id,
+                                "sending",
+                                queue.cursor,
+                                queue.packets.len(),
+                                0,
+                            );
                             let body = reqwest::blocking::Body::sized(
                                 gabbaproc_core::outbox::LimitedReader::new(bytes, bandwidth),
                                 len,
@@ -484,6 +542,23 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                     match transfer.and_then(|r| queue.receipt(&r)) {
                         Ok(advanced) => {
                             queue.save(&queue_path)?;
+                            let phase = if queue.blocked.is_some() {
+                                "blocked"
+                            } else if queue.cursor == queue.packets.len() {
+                                "complete"
+                            } else if advanced {
+                                "ready"
+                            } else {
+                                "waiting"
+                            };
+                            upload_progress(
+                                state,
+                                &id,
+                                phase,
+                                queue.cursor,
+                                queue.packets.len(),
+                                epoch_seconds() + 30,
+                            );
                             if !advanced {
                                 break;
                             }
@@ -495,6 +570,14 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                                 .subsec_nanos() as u64;
                             queue.retry(now, retry_after, jitter);
                             queue.save(&queue_path)?;
+                            upload_progress(
+                                state,
+                                &id,
+                                "retry",
+                                queue.cursor,
+                                queue.packets.len(),
+                                queue.retry_at,
+                            );
                             return Err(e);
                         }
                     }
@@ -506,6 +589,7 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                     save(&s)?;
                     fs::remove_file(&queue_path)
                         .map_err(|_| "Cannot remove completed local queue")?;
+                    s.progress.insert(id.clone(), json!({"phase":"complete","confirmed":queue.packets.len(),"total":queue.packets.len(),"nextCheck":0}));
                     return Ok(true);
                 }
                 if let Some(reason) = queue.blocked {
@@ -516,7 +600,15 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
             match attempt {
                 Ok(true) => uploaded += 1,
                 Ok(false) => {}
-                Err(e) => errors.push(format!("{}: {e}", id.chars().take(8).collect::<String>())),
+                Err(e) => {
+                    let mut inner = state.0.lock().unwrap();
+                    if let Some(p) = inner.progress.get_mut(&id) {
+                        if p["phase"] != "retry" && p["phase"] != "blocked" {
+                            p["phase"] = json!("error");
+                        }
+                    }
+                    errors.push(format!("{}: {e}", id.chars().take(8).collect::<String>()));
+                }
             }
         }
         Ok(json!({"uploaded":uploaded,"pendingPackets":pending,"errors":errors}))
@@ -695,6 +787,7 @@ pub fn run() {
                 last_queue_attempt: None,
                 manual_drain: false,
                 status: String::new(),
+                progress: BTreeMap::new(),
                 files: BTreeMap::new(),
                 config_file: file,
             })));
@@ -840,6 +933,7 @@ mod transport_tests {
             last_queue_attempt: None,
             manual_drain: false,
             status: String::new(),
+            progress: BTreeMap::new(),
             files: BTreeMap::new(),
             config_file: dir.join("preferences.json"),
         })));
@@ -862,6 +956,8 @@ mod transport_tests {
         queue.save(&queue_path).unwrap();
         let second = sync_inner(&state, false).unwrap();
         assert_eq!(second["pendingPackets"], 1);
+        assert_eq!(state.0.lock().unwrap().progress[id]["phase"], "waiting");
+        assert_eq!(state.0.lock().unwrap().progress[id]["confirmed"], 0);
         assert!(state.0.lock().unwrap().config.acks.is_empty());
         // Simulated process state loss; no source file is available.
         state.0.lock().unwrap().last_auto_attempt = None;
@@ -875,6 +971,8 @@ mod transport_tests {
         state.0.lock().unwrap().last_queue_attempt = None;
         let third = sync_inner(&state, true).unwrap();
         assert_eq!(third["uploaded"], 1);
+        assert_eq!(state.0.lock().unwrap().progress[id]["phase"], "complete");
+        assert_eq!(state.0.lock().unwrap().progress[id]["confirmed"], 1);
         assert_eq!(state.0.lock().unwrap().config.acks[id], "fingerprint");
         assert!(!queue_path.exists());
         assert!(!state.0.lock().unwrap().manual_drain);

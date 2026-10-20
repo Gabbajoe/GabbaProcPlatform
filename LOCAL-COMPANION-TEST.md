@@ -67,3 +67,10 @@ The prepared workstation test environment uses a separate
 `gabbaproc_companion_test` database and local API port 8771. A private test token
 is in `desktop/target/local-build/LOCAL-TEST-TOKEN.txt`; paste it into this test
 app only. The API and worker run locally and need restarting after a reboot.
+
+Development build dev.3 adds per-character upload progress. Percentages count
+server-confirmed packets, not bytes sent. Preparing, sending, checking, waiting,
+retry, pause, error and completed states are localized. A local one-second UI
+refresh drives the countdown without increasing server polling. Native tests
+assert that a queued receipt remains at zero confirmed and only a processed
+receipt reaches completion; browser tests cover the visible state transitions.
