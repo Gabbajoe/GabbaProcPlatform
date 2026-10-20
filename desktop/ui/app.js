@@ -451,6 +451,7 @@ async function scan() {
     preview.onclick = () =>
       run(async () => {
         previewData.textContent = JSON.stringify(await invoke("preview", { id: row.id }), null, 2);
+        $("preview").textContent = previewData.textContent;
         previewPanel.hidden = false;
         previewPanel.open = true;
       });
