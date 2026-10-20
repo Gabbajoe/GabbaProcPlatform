@@ -116,9 +116,42 @@ label {
 }
 #language {
   margin-left: auto;
-  padding: 5px 11px;
-  background: transparent;
+  display: inline-flex;
+  flex-shrink: 0;
+  border: 1px solid #71522d;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #151c27;
 }
+#language button {
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  min-width: 33px;
+  padding: 8px 9px;
+  background: transparent;
+  color: #c2af91;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 750;
+}
+#language button[aria-pressed="true"] {
+  background: #c7933f;
+  color: #17120b;
+}
+#language button:hover {
+  background: #493b29;
+  color: #fff0d6;
+}
+#language button[aria-pressed="true"]:hover {
+  background: #d5a14d;
+  color: #17120b;
+}
+#language button:focus-visible {
+  outline: 2px solid #f7dc9e;
+  outline-offset: -3px;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 218px minmax(0, 1fr);

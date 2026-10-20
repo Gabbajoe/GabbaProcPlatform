@@ -33,7 +33,11 @@ function translate() {
   document.documentElement.lang = language;
   for (const e of document.querySelectorAll("[data-en][data-de]"))
     e.textContent = e.dataset[language];
-  $("language").value = language;
+  for (const button of $("language").querySelectorAll("[data-language]"))
+    button.setAttribute(
+      "aria-pressed",
+      String(button.dataset.language === language),
+    );
   document.querySelector(".skip").textContent = t(
     "Skip to content",
     "Zum Inhalt",
@@ -233,8 +237,10 @@ async function refresh() {
     render();
   }
 }
-$("language").onchange = () => {
-  language = $("language").value;
+$("language").onclick = (event) => {
+  const button = event.target.closest("button[data-language]");
+  if (!button || !$("language").contains(button)) return;
+  language = button.dataset.language;
   try {
     localStorage.setItem("language", language);
   } catch (_) {}
