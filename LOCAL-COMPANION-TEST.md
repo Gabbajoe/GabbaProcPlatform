@@ -87,3 +87,11 @@ retry, pause, error and completed states are localized. A local one-second UI
 refresh drives the countdown without increasing server polling. Native tests
 assert that a queued receipt remains at zero confirmed and only a processed
 receipt reaches completion; browser tests cover the visible state transitions.
+
+Development build dev.5 separates uploaded packets (blue) from processed packets
+(turquoise). Upload progress advances when the server returns a receipt, not when
+bytes merely leave the client. Processing advances only on processed receipts.
+Both percentages count packets, not bytes. The progress heading uses the locally
+discovered character name and realm; these labels do not change upload privacy.
+A badge shows whether the queued payload is anonymous or includes name and realm.
+The existing sequential transport and confirmation polling interval are unchanged.

@@ -76,6 +76,7 @@ async function run(f) {
   }
 }
 let progressSignature = "";
+const characterLabels = new Map();
 function renderProgress(s) {
   const entries = Object.entries(s.progress || {});
   const signature = JSON.stringify([
@@ -84,6 +85,7 @@ function renderProgress(s) {
     s.busy,
     s.autoUpload,
     s.finishingUpload,
+    [...characterLabels],
   ]);
   const container = $("uploadProgress");
   container.hidden = entries.length === 0;
@@ -142,32 +144,47 @@ function renderProgress(s) {
       row.dataset.phase = phase;
       const heading = document.createElement("strong");
       heading.textContent =
-        entries.length === 1
-          ? text("Upload progress", "Upload-Fortschritt")
-          : text(`Character ${id.slice(0, 8)}`, `Charakter ${id.slice(0, 8)}`);
+        characterLabels.get(id) ||
+        text(`Character ${id.slice(0, 8)}`, `Charakter ${id.slice(0, 8)}`);
       const label = document.createElement("p");
       label.className = "progress-phase";
       label.setAttribute("role", "status");
       label.textContent = labels[phase] || phase;
-      row.append(heading, label);
+      row.append(heading);
+      if (typeof p.named === "boolean") {
+        const privacy = document.createElement("span");
+        privacy.className = "progress-privacy";
+        privacy.textContent = p.named
+          ? text("With character name and realm", "Mit Charaktername und Realm")
+          : text("Anonymous", "Anonym");
+        row.append(privacy);
+      }
+      row.append(label);
       if (p.total > 0) {
-        const bar = document.createElement("progress");
-        bar.max = p.total;
-        bar.value = Math.min(p.confirmed, p.total);
-        bar.setAttribute(
-          "aria-label",
-          text("Packets confirmed by server", "Vom Server bestätigte Pakete"),
-        );
-        const count = document.createElement("span");
-        count.className = "progress-count";
-        const percent = Math.floor(
-          (100 * Math.min(p.confirmed, p.total)) / p.total,
-        );
-        count.textContent = text(
-          `${p.confirmed} / ${p.total} packets confirmed · ${percent}%`,
-          `${p.confirmed} / ${p.total} Pakete bestätigt · ${percent}%`,
-        );
-        row.append(bar, count);
+        const stages = [
+          [
+            "upload",
+            text("Uploaded to server", "Zum Server hochgeladen"),
+            p.received ?? p.confirmed,
+          ],
+          [
+            "processing",
+            text("Processed by server", "Vom Server verarbeitet"),
+            p.confirmed,
+          ],
+        ];
+        for (const [stage, title, value] of stages) {
+          const completed = Math.max(0, Math.min(value, p.total));
+          const count = document.createElement("p");
+          count.className = "progress-count";
+          count.textContent = `${title}: ${completed} / ${p.total} · ${Math.floor((100 * completed) / p.total)}%`;
+          const bar = document.createElement("progress");
+          bar.dataset.stage = stage;
+          bar.max = p.total;
+          bar.value = completed;
+          bar.setAttribute("aria-label", title);
+          row.append(count, bar);
+        }
       } else if (phase === "preparing") {
         const bar = document.createElement("progress");
         bar.setAttribute("aria-label", labels.preparing);
@@ -235,6 +252,12 @@ async function scan() {
     );
   const rows = await invoke("discover");
   if (generation !== scanGeneration) return;
+  for (const row of rows) {
+    if (row.id && !row.error) {
+      const label = [row.localName, row.realm].filter(Boolean).join(" · ");
+      if (label) characterLabels.set(row.id, label);
+    }
+  }
   $("characters").replaceChildren();
   const groups = new Map();
   for (const row of rows) {

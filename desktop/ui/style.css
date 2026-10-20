@@ -146,6 +146,18 @@ summary {
 .upload-progress-row strong {
   color: #f5c974;
 }
+.progress-privacy {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 3px 8px;
+  border: 1px solid #415673;
+  border-radius: 12px;
+  color: #b4c4d9;
+  font-size: 12px;
+}
+.upload-progress-row progress[data-stage="upload"]::-webkit-progress-value {
+  background: #6ab3ff;
+}
 .upload-progress-row p {
   margin: 8px 0;
 }

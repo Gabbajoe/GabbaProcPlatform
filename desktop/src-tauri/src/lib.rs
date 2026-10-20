@@ -357,13 +357,15 @@ fn upload_progress(
     state: &AppState,
     id: &str,
     phase: &str,
+    named: Option<bool>,
     confirmed: usize,
+    received: usize,
     total: usize,
     next_check: u64,
 ) {
     state.0.lock().unwrap().progress.insert(
         id.to_string(),
-        json!({"phase":phase,"confirmed":confirmed,"total":total,"nextCheck":next_check}),
+        json!({"phase":phase,"named":named,"confirmed":confirmed,"received":received,"total":total,"nextCheck":next_check}),
     );
 }
 fn epoch_seconds() -> u64 {
@@ -427,7 +429,7 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
         let mut sent_packets = 0;
         for (id, path, named, ack, queue_path) in jobs {
             let attempt: Result<bool> = (|| {
-                upload_progress(state, &id, "preparing", 0, 0, 0);
+                upload_progress(state, &id, "preparing", None, 0, 0, 0, 0);
                 let mut queue = match gabbaproc_core::outbox::Outbox::load(&queue_path)? {
                     Some(queue) => queue,
                     None => {
@@ -441,7 +443,7 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                             Sha256::digest(serde_json::to_vec(&packets).unwrap())
                         );
                         if ack.as_deref() == Some(&hash) {
-                            upload_progress(state, &id, "unchanged", 0, 0, 0);
+                            upload_progress(state, &id, "unchanged", None, 0, 0, 0, 0);
                             return Ok(false);
                         }
                         let queue = gabbaproc_core::outbox::Outbox::new(hash, packets, named);
@@ -453,7 +455,9 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                     state,
                     &id,
                     "ready",
+                    Some(queue.named),
                     queue.cursor,
+                    queue.cursor + usize::from(queue.job_id.is_some()),
                     queue.packets.len(),
                     epoch_seconds() + 30,
                 );
@@ -485,7 +489,16 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                     queue.save(&queue_path)?;
                 }
                 if let Some(reason) = &queue.blocked {
-                    upload_progress(state, &id, "blocked", queue.cursor, queue.packets.len(), 0);
+                    upload_progress(
+                        state,
+                        &id,
+                        "blocked",
+                        Some(queue.named),
+                        queue.cursor,
+                        queue.cursor + usize::from(queue.job_id.is_some()),
+                        queue.packets.len(),
+                        0,
+                    );
                     return Err(format!("Upload {reason}; local queue retained"));
                 }
                 let now = std::time::SystemTime::now()
@@ -497,7 +510,9 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                         state,
                         &id,
                         "retry",
+                        Some(queue.named),
                         queue.cursor,
+                        queue.cursor + usize::from(queue.job_id.is_some()),
                         queue.packets.len(),
                         queue.retry_at,
                     );
@@ -512,7 +527,9 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                                 state,
                                 &id,
                                 "checking",
+                                Some(queue.named),
                                 queue.cursor,
+                                queue.cursor + usize::from(queue.job_id.is_some()),
                                 queue.packets.len(),
                                 0,
                             );
@@ -535,7 +552,9 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                                 state,
                                 &id,
                                 "sending",
+                                Some(queue.named),
                                 queue.cursor,
+                                queue.cursor + usize::from(queue.job_id.is_some()),
                                 queue.packets.len(),
                                 0,
                             );
@@ -575,7 +594,9 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                                 state,
                                 &id,
                                 phase,
+                                Some(queue.named),
                                 queue.cursor,
+                                queue.cursor + usize::from(queue.job_id.is_some()),
                                 queue.packets.len(),
                                 epoch_seconds() + 30,
                             );
@@ -594,7 +615,9 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                                 state,
                                 &id,
                                 "retry",
+                                Some(queue.named),
                                 queue.cursor,
+                                queue.cursor + usize::from(queue.job_id.is_some()),
                                 queue.packets.len(),
                                 queue.retry_at,
                             );
@@ -609,7 +632,7 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                     save(&s)?;
                     fs::remove_file(&queue_path)
                         .map_err(|_| "Cannot remove completed local queue")?;
-                    s.progress.insert(id.clone(), json!({"phase":"complete","confirmed":queue.packets.len(),"total":queue.packets.len(),"nextCheck":0}));
+                    s.progress.insert(id.clone(), json!({"phase":"complete","named":queue.named,"confirmed":queue.packets.len(),"received":queue.packets.len(),"total":queue.packets.len(),"nextCheck":0}));
                     return Ok(true);
                 }
                 if let Some(reason) = queue.blocked {
@@ -1018,6 +1041,7 @@ mod transport_tests {
         assert_eq!(second["pendingPackets"], 1);
         assert_eq!(state.0.lock().unwrap().progress[id]["phase"], "waiting");
         assert_eq!(state.0.lock().unwrap().progress[id]["confirmed"], 0);
+        assert_eq!(state.0.lock().unwrap().progress[id]["received"], 1);
         assert!(state.0.lock().unwrap().config.acks.is_empty());
         // Simulated process state loss; no source file is available.
         state.0.lock().unwrap().last_auto_attempt = None;
