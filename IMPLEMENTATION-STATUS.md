@@ -27,13 +27,28 @@ them without duplicate counts. It made 453 requests including 53 retryable
 overload responses. HTTP p95 was 2.617 seconds; unpaced worker processing took
 0.237 seconds. This is not a production HTTP/proxy or large-backlog benchmark.
 
+## Archive transport update — local development
+
+Implemented since the initial checkpoint: version 2 bounded archive batches,
+late history backfill, cross-batch cumulative consistency checks with an
+incremental usage index, and a persistent companion outbox. The companion polls
+server receipts and acknowledges only processed jobs. Network/rate-limit errors
+retain data with persisted retry/backoff. Optional 64–1024 KiB/s bandwidth limits
+apply to serial manual and automatic uploads; unlimited remains the default.
+
+Validation: 25 PostgreSQL tests pass, including a >8 MiB Lua SavedVariables file
+processed by the real Rust parser into 19 packets and 1,702 stored fights across
+two collections. Thirteen core Rust tests and a native HTTP transport test pass.
+The local debug AppImage starts on the workstation. See
+[local companion test instructions](LOCAL-COMPANION-TEST.md). No release pipeline
+was started for this work and the production deployment remains unchanged.
+
 ## Required before production cutover
 
-1. Define and implement bounded archive batches and out-of-order history backfill.
-   The current queue accepts legacy schema 1 with at most 301 segments per upload.
-2. Extend the companion to read the addon's full archive and reset collections,
-   persist pending batches locally, poll receipts, and retry safely. The current
-   companion still uses the legacy synchronous endpoint.
+1. Validate the new bounded archive batches and late backfill under representative
+   concurrent load and interruptions. The published client still uses schema 1.
+2. Validate the new companion outbox on Windows/macOS and in real WoW usage;
+   define operator recovery for blocked jobs and long-running archive limits.
 3. Complete account, identity, session, device-pairing and email-login code.
    Register OAuth applications and configure outgoing mail; none are active yet.
 4. Test worker interruption, pending-job disaster recovery, large archives,
@@ -45,5 +60,5 @@ overload responses. HTTP p95 was 2.617 seconds; unpaced worker processing took
 The addon branch adds opt-in zone snapshots and a full local combat archive,
 including collections retained through reset. The UI and legacy export retain
 their 300-entry view. Archive memory/file growth and companion support still
-need work. Zone export changes SavedVariables in memory; WoW writes the file
+need further real-client validation. Zone export changes SavedVariables in memory; WoW writes the file
 only on reload/logout. No new addon or companion release was published here.

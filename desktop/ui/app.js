@@ -15,6 +15,10 @@ const de = {
   sync: "3 · Synchronisieren",
   auto: "Geänderte Exporte automatisch hochladen",
   interval: "Upload-Intervall",
+  bandwidth: "Upload-Bandbreite",
+  unlimited: "Unbegrenzt",
+  localBuild:
+    "Lokale Testversion: Uploads gehen nur an den lokalen Testserver.",
   quit: "App beenden",
   startup: "Bei der Anmeldung starten",
   updates: "Signierte App-Updates automatisch installieren (App startet neu)",
@@ -47,9 +51,23 @@ function language() {
   run(() => invoke("set_language", { language: lang }));
 }
 function status(v) {
-  $("status").textContent =
-    typeof v === "string" ? v : JSON.stringify(v, null, 2);
+  if (typeof v === "string" && v.startsWith("{")) {
+    try {
+      v = JSON.parse(v);
+    } catch (_) {}
+  }
+  if (v && typeof v === "object" && "pendingPackets" in v) {
+    $("status").textContent =
+      text(
+        `${v.uploaded} character archives confirmed. ${v.pendingPackets} packets pending.`,
+        `${v.uploaded} Charakterarchive bestätigt. ${v.pendingPackets} Pakete ausstehend.`,
+      ) + (v.errors?.length ? "\n" + v.errors.join("\n") : "");
+  } else {
+    $("status").textContent =
+      typeof v === "string" ? v : JSON.stringify(v, null, 2);
+  }
 }
+
 async function run(f) {
   try {
     return await f();
@@ -59,8 +77,19 @@ async function run(f) {
 }
 async function overview() {
   const s = await invoke("overview");
+  if (s.version) $("appVersion").textContent = s.version;
+  if (s.localBuild) {
+    $("localBuild").hidden = false;
+    $("update").disabled = true;
+    $("updates").disabled = true;
+    document.querySelector('[data-t="tokenHelp"]').textContent = text(
+      "Use a token from the local test server. Production upload tokens do not work here.",
+      "Verwende einen Token des lokalen Testservers. Upload-Tokens der öffentlichen Webseite funktionieren hier nicht.",
+    );
+  }
   $("auto").checked = s.autoUpload;
   $("interval").value = String(s.uploadIntervalMinutes || 15);
+  $("bandwidth").value = String(s.uploadBandwidthKib || 0);
   $("credential").textContent = s.hasToken
     ? s.persistentToken
       ? text("Saved in keyring", "Im Schlüsselbund gespeichert")
@@ -102,13 +131,26 @@ async function scan() {
     box.append(title, source);
     if (row.error) {
       const errors = {
-        missing_snapshot: text("No export snapshot yet. In this character's WoW session, use /gpt export, then /reload or log out.", "Noch kein Export-Snapshot. Mit diesem Charakter in WoW /gpt export und danach /reload ausführen oder ausloggen."),
-        invalid_export: text("Export incomplete or unsupported. Update the addon, export again and /reload.", "Export unvollständig oder nicht unterstützt. Addon aktualisieren, erneut exportieren und /reload ausführen."),
-        unreadable_export: text("File cannot be read or parsed. Export again in WoW and /reload.", "Datei nicht lesbar oder fehlerhaft. In WoW erneut exportieren und /reload ausführen."),
-        duplicate: text("Duplicate character ID. The first listed export for this character is used.", "Doppelte Charakter-ID. Der zuerst aufgeführte Export dieses Charakters wird verwendet."),
+        missing_snapshot: text(
+          "No export snapshot yet. In this character's WoW session, use /gpt export, then /reload or log out.",
+          "Noch kein Export-Snapshot. Mit diesem Charakter in WoW /gpt export und danach /reload ausführen oder ausloggen.",
+        ),
+        invalid_export: text(
+          "Export incomplete or unsupported. Update the addon, export again and /reload.",
+          "Export unvollständig oder nicht unterstützt. Addon aktualisieren, erneut exportieren und /reload ausführen.",
+        ),
+        unreadable_export: text(
+          "File cannot be read or parsed. Export again in WoW and /reload.",
+          "Datei nicht lesbar oder fehlerhaft. In WoW erneut exportieren und /reload ausführen.",
+        ),
+        duplicate: text(
+          "Duplicate character ID. The first listed export for this character is used.",
+          "Doppelte Charakter-ID. Der zuerst aufgeführte Export dieses Charakters wird verwendet.",
+        ),
       };
       const error = document.createElement("p");
-      error.textContent = errors[row.error] || text("Invalid export.", "Ungültiger Export.");
+      error.textContent =
+        errors[row.error] || text("Invalid export.", "Ungültiger Export.");
       box.append(error);
       group.append(box);
       continue;
@@ -183,7 +225,10 @@ async function scan() {
 $("lang").onchange = () => {
   lang = $("lang").value;
   language();
-  run(async () => { await overview(); await scan(); });
+  run(async () => {
+    await overview();
+    await scan();
+  });
 };
 $("scan").onclick = () => run(scan);
 $("folder").onclick = () =>
@@ -205,7 +250,10 @@ $("saveToken").onclick = () =>
   });
 $("auto").onchange = () =>
   run(() => invoke("set_auto", { enabled: $("auto").checked }));
-$("interval").onchange = () => run(() => invoke("set_interval", { minutes: Number($("interval").value) }));
+$("bandwidth").onchange = () =>
+  run(() => invoke("set_bandwidth", { kib: Number($("bandwidth").value) }));
+$("interval").onchange = () =>
+  run(() => invoke("set_interval", { minutes: Number($("interval").value) }));
 $("quit").onclick = () => run(() => invoke("quit_app"));
 $("startup").onchange = () =>
   run(async () => {
@@ -242,7 +290,7 @@ async function update(manual) {
   updating = true;
   try {
     const s = await overview();
-    if (s.busy) return;
+    if (s.busy || s.localBuild) return;
     const u = await window.__TAURI__.updater.check();
     if (!u) {
       if (manual) status(text("App is up to date.", "App ist aktuell."));

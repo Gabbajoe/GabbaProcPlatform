@@ -25,6 +25,7 @@ struct Config {
     auto_upload: bool,
     #[serde(default = "default_interval")]
     upload_interval_minutes: u64,
+    upload_bandwidth_kib: u64,
     token_digest: Option<String>,
     acks: BTreeMap<String, String>,
 }
@@ -37,6 +38,7 @@ struct Inner {
     persistent: bool,
     busy: bool,
     last_auto_attempt: Option<Instant>,
+    last_queue_attempt: Option<Instant>,
     status: String,
     files: BTreeMap<String, PathBuf>,
     config_file: PathBuf,
@@ -45,8 +47,15 @@ struct Inner {
 struct AppState(Arc<Mutex<Inner>>);
 struct RestartTarget(Mutex<Option<PathBuf>>);
 fn key() -> Result<keyring::Entry> {
-    keyring::Entry::new("info.kellerkind.gabbaproc", "upload-token")
-        .map_err(|_| "System keyring unavailable".into())
+    keyring::Entry::new(
+        if cfg!(debug_assertions) {
+            "info.kellerkind.gabbaproc.dev"
+        } else {
+            "info.kellerkind.gabbaproc"
+        },
+        "upload-token",
+    )
+    .map_err(|_| "System keyring unavailable".into())
 }
 fn save(s: &Inner) -> Result<()> {
     let data = serde_json::to_vec_pretty(&s.config).map_err(|_| "Cannot encode preferences")?;
@@ -60,9 +69,25 @@ fn save(s: &Inner) -> Result<()> {
     }
     fs::rename(temp, &s.config_file).map_err(|_| "Cannot replace preferences".into())
 }
+fn api_base() -> String {
+    #[cfg(debug_assertions)]
+    if let Ok(value) = std::env::var("GABBAPROC_TEST_API") {
+        if let Ok(url) = reqwest::Url::parse(&value) {
+            if url.scheme() == "http" && url.host_str() == Some("127.0.0.1") && url.path() == "/api"
+            {
+                return value;
+            }
+        }
+    }
+    if cfg!(debug_assertions) {
+        "http://127.0.0.1:8771/api".to_string()
+    } else {
+        API.to_string()
+    }
+}
 fn client() -> Result<reqwest::blocking::Client> {
     reqwest::blocking::Client::builder()
-        .https_only(true)
+        .https_only(!api_base().starts_with("http://127.0.0.1:"))
         .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(25))
         .build()
@@ -93,9 +118,9 @@ fn response(r: std::result::Result<reqwest::blocking::Response, reqwest::Error>)
     serde_json::from_slice(&bytes).map_err(|_| "Invalid server response".into())
 }
 #[tauri::command]
-fn overview(state: State<AppState>) -> Value {
+fn overview(state: State<AppState>, app: tauri::AppHandle) -> Value {
     let s = state.0.lock().unwrap();
-    json!({"autoUpload":s.config.auto_upload,"uploadIntervalMinutes":s.config.upload_interval_minutes,"hasToken":s.token.is_some(),"persistentToken":s.persistent,"busy":s.busy,"status":s.status})
+    json!({"version":app.package_info().version.to_string(),"localBuild":cfg!(debug_assertions),"autoUpload":s.config.auto_upload,"uploadIntervalMinutes":s.config.upload_interval_minutes,"uploadBandwidthKib":s.config.upload_bandwidth_kib,"hasToken":s.token.is_some(),"persistentToken":s.persistent,"busy":s.busy,"status":s.status})
 }
 #[tauri::command]
 fn discover(state: State<AppState>) -> Result<Value> {
@@ -169,6 +194,18 @@ fn set_interval(minutes: u64, state: State<AppState>) -> Result<()> {
     let mut s = state.0.lock().unwrap();
     s.config.upload_interval_minutes = minutes;
     s.last_auto_attempt = Some(Instant::now());
+    save(&s)
+}
+#[tauri::command]
+fn set_bandwidth(kib: u64, state: State<AppState>) -> Result<()> {
+    if ![0, 64, 128, 256, 512, 1024].contains(&kib) {
+        return Err("Invalid bandwidth limit".into());
+    }
+    let mut s = state.0.lock().unwrap();
+    if s.busy {
+        return Err("Wait until the current upload finishes".into());
+    }
+    s.config.upload_bandwidth_kib = kib;
     save(&s)
 }
 #[tauri::command]
@@ -257,7 +294,8 @@ fn preview(id: String, state: State<AppState>) -> Result<Value> {
     let s = state.0.lock().unwrap();
     let path = s.files.get(&id).ok_or("Unknown character")?;
     let named = s.config.choices.get(&id).is_some_and(|c| c.named);
-    gabbaproc_core::payload(&gabbaproc_core::read_file(path)?, named)
+    gabbaproc_core::payload_batches(&gabbaproc_core::read_file(path)?, named)
+        .map(|packets| json!({"packets": packets}))
 }
 #[tauri::command]
 fn set_token(token: String, state: State<AppState>) -> Result<bool> {
@@ -282,75 +320,198 @@ fn set_token(token: String, state: State<AppState>) -> Result<bool> {
     save(&s)?;
     Ok(s.persistent)
 }
+fn outbox_path(s: &Inner, token: &str, id: &str) -> PathBuf {
+    s.config_file
+        .parent()
+        .unwrap()
+        .join("outbox")
+        .join(format!("{:x}", Sha256::digest(token.as_bytes())))
+        .join(format!("{:x}.json", Sha256::digest(id.as_bytes())))
+}
 fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
-    let (token, jobs) = {
+    let (token, jobs, bandwidth) = {
         let mut s = state.0.lock().unwrap();
         if s.busy || (automatic && !s.config.auto_upload) {
             return Ok(json!({"status":"idle"}));
         }
-        if automatic {
-            let wait = Duration::from_secs(s.config.upload_interval_minutes * 60);
-            if s.last_auto_attempt
-                .is_some_and(|last| last.elapsed() < wait)
-            {
-                return Ok(json!({"status":"idle"}));
-            }
+        if automatic
+            && s.last_queue_attempt
+                .is_some_and(|last| last.elapsed() < Duration::from_secs(30))
+        {
+            return Ok(json!({"status":"idle"}));
         }
-        s.last_auto_attempt = Some(Instant::now());
+        s.last_queue_attempt = Some(Instant::now());
+        let fresh = !automatic
+            || s.last_auto_attempt.is_none_or(|last| {
+                last.elapsed() >= Duration::from_secs(s.config.upload_interval_minutes * 60)
+            });
+        if fresh {
+            s.last_auto_attempt = Some(Instant::now());
+        }
         let token = s.token.clone().ok_or("Set your upload token first")?;
         let jobs: Vec<_> = s
-            .files
+            .config
+            .choices
             .iter()
-            .filter_map(|(id, path)| {
-                let c = s.config.choices.get(id)?;
-                if c.enabled {
-                    Some((
-                        id.clone(),
-                        path.clone(),
-                        c.named,
-                        s.config.acks.get(id).cloned(),
-                    ))
-                } else {
-                    None
-                }
+            .filter(|(_, c)| c.enabled)
+            .map(|(id, c)| {
+                (
+                    id.clone(),
+                    s.files.get(id).cloned(),
+                    c.named,
+                    s.config.acks.get(id).cloned(),
+                    outbox_path(&s, &token, id),
+                )
             })
+            .filter(|(_, _, _, _, queue_path)| fresh || queue_path.exists())
             .collect();
         s.busy = true;
-        (token, jobs)
+        (token, jobs, s.config.upload_bandwidth_kib)
     };
     let result: Result<Value> = (|| {
         let client = client()?;
         let mut uploaded = 0;
+        let mut pending = 0;
         let mut errors = Vec::new();
-        for (id, path, named, ack) in jobs {
+        let mut sent_packets = 0;
+        for (id, path, named, ack, queue_path) in jobs {
             let attempt: Result<bool> = (|| {
-                let p = gabbaproc_core::payload(&gabbaproc_core::read_file(&path)?, named)?;
-                let hash = format!("{:x}", Sha256::digest(serde_json::to_vec(&p).unwrap()));
-                if ack.as_deref() == Some(&hash) {
+                let mut queue = match gabbaproc_core::outbox::Outbox::load(&queue_path)? {
+                    Some(queue) => queue,
+                    None => {
+                        let raw = gabbaproc_core::read_file(
+                            path.as_ref()
+                                .ok_or("Export unavailable; select its WoW folder")?,
+                        )?;
+                        let packets = gabbaproc_core::payload_batches(&raw, named)?;
+                        let hash = format!(
+                            "{:x}",
+                            Sha256::digest(serde_json::to_vec(&packets).unwrap())
+                        );
+                        if ack.as_deref() == Some(&hash) {
+                            return Ok(false);
+                        }
+                        let queue = gabbaproc_core::outbox::Outbox::new(hash, packets, named);
+                        queue.save(&queue_path)?;
+                        queue
+                    }
+                };
+                // An opt-out applies before resuming any previously named queue.
+                if queue.named && !named {
+                    let r = client
+                        .post(format!("{}/privacy", api_base()))
+                        .bearer_auth(&token)
+                        .json(&json!({"characterId": id}))
+                        .send()
+                        .map_err(|_| "Cannot apply anonymous mode; nothing uploaded")?;
+                    if r.status().as_u16() != 404 {
+                        response(Ok(r))?;
+                    }
+                    for p in &mut queue.packets {
+                        p["privacy"] = json!("anonymous");
+                        p.as_object_mut().unwrap().remove("name");
+                        p.as_object_mut().unwrap().remove("realm");
+                    }
+                    queue.named = false;
+                    queue.job_id = None;
+                    queue.blocked = None;
+                    queue.cursor = 0;
+                    queue.retry_at = 0;
+                    queue.fingerprint = format!(
+                        "{:x}",
+                        Sha256::digest(serde_json::to_vec(&queue.packets).unwrap())
+                    );
+                    queue.save(&queue_path)?;
+                }
+                if let Some(reason) = &queue.blocked {
+                    return Err(format!("Upload {reason}; local queue retained"));
+                }
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                if queue.retry_at > now {
+                    pending += queue.packets.len() - queue.cursor;
                     return Ok(false);
                 }
-                let r = response(
-                    client
-                        .post(format!("{API}/imports"))
-                        .bearer_auth(&token)
-                        .json(&p)
-                        .send(),
-                )?;
-                let mut s = state.0.lock().unwrap();
-                s.config.acks.insert(id.clone(), hash);
-                save(&s)?;
-                if r["review"] == "quarantine" {
-                    return Err("Accepted for review; excluded from public statistics".into());
+                while queue.cursor < queue.packets.len() && sent_packets < 12 {
+                    let mut retry_after = 0;
+                    let transfer: Result<Value> = (|| {
+                        let response_result = if let Some(job) = &queue.job_id {
+                            let r = client
+                                .get(format!("{}/upload-jobs/{job}", api_base()))
+                                .bearer_auth(&token)
+                                .send()
+                                .map_err(|_| "Cannot check receipt; data stays local")?;
+                            if r.status().as_u16() == 404 {
+                                queue.job_id = None; // receipt lost: replay immutable packet safely
+                                return Err("Receipt unavailable; packet will be retried".into());
+                            }
+                            r
+                        } else {
+                            let bytes = serde_json::to_vec(&queue.packets[queue.cursor])
+                                .map_err(|_| "Cannot encode packet")?;
+                            let len = bytes.len() as u64;
+                            sent_packets += 1;
+                            let body = reqwest::blocking::Body::sized(
+                                gabbaproc_core::outbox::LimitedReader::new(bytes, bandwidth),
+                                len,
+                            );
+                            client
+                                .post(format!("{}/upload-jobs", api_base()))
+                                .bearer_auth(&token)
+                                .header("Content-Type", "application/json")
+                                .body(body)
+                                .send()
+                                .map_err(|_| "Connection failed; packet stays local")?
+                        };
+                        retry_after = response_result
+                            .headers()
+                            .get("retry-after")
+                            .and_then(|v| v.to_str().ok())
+                            .and_then(|v| v.parse::<u64>().ok())
+                            .unwrap_or(0);
+                        response(Ok(response_result))
+                    })();
+                    match transfer.and_then(|r| queue.receipt(&r)) {
+                        Ok(advanced) => {
+                            queue.save(&queue_path)?;
+                            if !advanced {
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            let jitter = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .subsec_nanos() as u64;
+                            queue.retry(now, retry_after, jitter);
+                            queue.save(&queue_path)?;
+                            return Err(e);
+                        }
+                    }
                 }
-                Ok(true)
+                pending += queue.packets.len() - queue.cursor;
+                if queue.cursor == queue.packets.len() {
+                    let mut s = state.0.lock().unwrap();
+                    s.config.acks.insert(id.clone(), queue.fingerprint);
+                    save(&s)?;
+                    fs::remove_file(&queue_path)
+                        .map_err(|_| "Cannot remove completed local queue")?;
+                    return Ok(true);
+                }
+                if let Some(reason) = queue.blocked {
+                    return Err(format!("Upload {reason}; local queue retained"));
+                }
+                Ok(false)
             })();
             match attempt {
                 Ok(true) => uploaded += 1,
                 Ok(false) => {}
-                Err(e) => errors.push(format!("{}: {e}", &id[..8])),
+                Err(e) => errors.push(format!("{}: {e}", id.chars().take(8).collect::<String>())),
             }
         }
-        Ok(json!({"uploaded":uploaded,"errors":errors}))
+        Ok(json!({"uploaded":uploaded,"pendingPackets":pending,"errors":errors}))
     })();
     let mut s = state.0.lock().unwrap();
     s.busy = false;
@@ -392,7 +553,7 @@ async fn hide_name(id: String, state: State<'_, AppState>) -> Result<()> {
         let result = client()
             .and_then(|c| {
                 response(
-                    c.post(format!("{API}/privacy"))
+                    c.post(format!("{}/privacy", api_base()))
                         .bearer_auth(token)
                         .json(&json!({"characterId":id}))
                         .send(),
@@ -423,8 +584,13 @@ async fn delete_data(state: State<'_, AppState>) -> Result<()> {
             i.busy = true;
             t
         };
-        let result = client()
-            .and_then(|c| response(c.delete(format!("{API}/device")).bearer_auth(token).send()));
+        let result = client().and_then(|c| {
+            response(
+                c.delete(format!("{}/device", api_base()))
+                    .bearer_auth(token)
+                    .send(),
+            )
+        });
         let mut i = s.0.lock().unwrap();
         i.busy = false;
         result?;
@@ -458,7 +624,7 @@ fn register_linux_desktop_for(
 }
 
 pub fn run() {
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", not(debug_assertions)))]
     {
         let executable = std::env::var_os("APPIMAGE")
             .map(PathBuf::from)
@@ -490,6 +656,9 @@ pub fn run() {
             if !gabbaproc_core::valid_upload_interval(config.upload_interval_minutes) {
                 config.upload_interval_minutes = default_interval();
             }
+            if ![0, 64, 128, 256, 512, 1024].contains(&config.upload_bandwidth_kib) {
+                config.upload_bandwidth_kib = 0;
+            }
             let token = key().ok().and_then(|k| k.get_password().ok()).filter(|t| {
                 config.token_digest.as_deref()
                     == Some(&format!("{:x}", Sha256::digest(t.as_bytes())))
@@ -500,6 +669,7 @@ pub fn run() {
                 token,
                 busy: false,
                 last_auto_attempt: Some(Instant::now()),
+                last_queue_attempt: None,
                 status: String::new(),
                 files: BTreeMap::new(),
                 config_file: file,
@@ -543,6 +713,7 @@ pub fn run() {
             add_root,
             set_auto,
             set_interval,
+            set_bandwidth,
             set_language,
             quit_app,
             restart_after_update,
@@ -568,4 +739,118 @@ pub fn run() {
             #[cfg(not(target_os = "linux"))]
             let _ = (app, event);
         });
+}
+
+#[cfg(test)]
+mod transport_tests {
+    use super::*;
+    #[test]
+    fn durable_retry_receipt_restart_and_offline_source() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::env::set_var("GABBAPROC_TEST_API", format!("http://127.0.0.1:{port}/api"));
+        let job = "b".repeat(64);
+        let replies = vec![
+            (429, json!({"detail":"Busy"})),
+            (202, json!({"jobId":job,"status":"queued"})),
+            (200, json!({"jobId":job,"status":"processed"})),
+        ];
+        let server = std::thread::spawn(move || {
+            for (index, (code, reply)) in replies.into_iter().enumerate() {
+                let (mut stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+                let mut request = Vec::new();
+                let mut byte = [0u8; 1];
+                while !request.ends_with(b"\r\n\r\n") {
+                    stream.read_exact(&mut byte).unwrap();
+                    request.push(byte[0]);
+                    assert!(request.len() < 16384);
+                }
+                let headers = String::from_utf8(request).unwrap();
+                assert!(headers.starts_with(if index == 2 {
+                    "GET /api/upload-jobs/"
+                } else {
+                    "POST /api/upload-jobs "
+                }));
+                let size = headers
+                    .lines()
+                    .find_map(|line| {
+                        line.to_ascii_lowercase()
+                            .strip_prefix("content-length: ")
+                            .and_then(|v| v.parse::<usize>().ok())
+                    })
+                    .unwrap_or(0);
+                let mut body = vec![0; size];
+                stream.read_exact(&mut body).unwrap();
+                if index < 2 {
+                    assert_eq!(
+                        serde_json::from_slice::<Value>(&body).unwrap()["schemaVersion"],
+                        2
+                    );
+                }
+                let body = reply.to_string();
+                write!(stream, "HTTP/1.1 {code} Test\r\nContent-Type: application/json\r\nContent-Length: {}\r\nRetry-After: 60\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+            }
+        });
+        let dir = std::env::temp_dir().join(format!("gabbaproc-transport-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let id = "12345678-1234-4234-8234-123456789abc";
+        let token = "local-test-token";
+        let mut config = Config::default();
+        config.choices.insert(
+            id.into(),
+            Choice {
+                enabled: true,
+                named: false,
+            },
+        );
+        let state = AppState(Arc::new(Mutex::new(Inner {
+            config,
+            token: Some(token.into()),
+            persistent: false,
+            busy: false,
+            last_auto_attempt: None,
+            last_queue_attempt: None,
+            status: String::new(),
+            files: BTreeMap::new(),
+            config_file: dir.join("preferences.json"),
+        })));
+        let queue_path = outbox_path(&state.0.lock().unwrap(), token, id);
+        let queue = gabbaproc_core::outbox::Outbox::new(
+            "fingerprint".into(),
+            vec![json!({"schemaVersion":2})],
+            false,
+        );
+        queue.save(&queue_path).unwrap();
+        let first = sync_inner(&state, false).unwrap();
+        assert_eq!(first["uploaded"], 0);
+        let mut queue = gabbaproc_core::outbox::Outbox::load(&queue_path)
+            .unwrap()
+            .unwrap();
+        assert_eq!(queue.cursor, 0);
+        assert!(queue.retry_at > 0);
+        assert!(state.0.lock().unwrap().config.acks.is_empty());
+        queue.retry_at = 0;
+        queue.save(&queue_path).unwrap();
+        let second = sync_inner(&state, false).unwrap();
+        assert_eq!(second["pendingPackets"], 1);
+        assert!(state.0.lock().unwrap().config.acks.is_empty());
+        // Simulated process state loss; no source file is available.
+        state.0.lock().unwrap().last_auto_attempt = None;
+        assert!(gabbaproc_core::outbox::Outbox::load(&queue_path)
+            .unwrap()
+            .unwrap()
+            .job_id
+            .is_some());
+        let third = sync_inner(&state, false).unwrap();
+        assert_eq!(third["uploaded"], 1);
+        assert_eq!(state.0.lock().unwrap().config.acks[id], "fingerprint");
+        assert!(!queue_path.exists());
+        server.join().unwrap();
+        std::env::remove_var("GABBAPROC_TEST_API");
+        fs::remove_dir_all(dir).unwrap();
+    }
 }

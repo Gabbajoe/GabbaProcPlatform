@@ -11,3 +11,6 @@ desktop/node_modules/
 
 desktop/src-tauri/icons/android/
 desktop/src-tauri/icons/ios/
+
+# Generated Tauri capability schemas
+desktop/src-tauri/gen/

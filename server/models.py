@@ -58,7 +58,7 @@ class Segment(Strict):
 
 
 class Upload(Strict):
-    schemaVersion: Literal[1]
+    schemaVersion: Literal[1, 2]
     addonVersion: str = Field(pattern=r"^\d{1,3}\.\d{1,3}\.\d{1,3}$")
     characterId: str
     collectionId: str

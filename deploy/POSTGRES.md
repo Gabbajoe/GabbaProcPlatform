@@ -43,8 +43,10 @@ compare totals and ownership, then test uploads before switching the proxy.
 The legacy `/api/imports` endpoint still responds only after processing. New
 `POST /api/upload-jobs` returns 202 with a job ID; poll the authenticated
 `GET /api/upload-jobs/{id}` until `processed`, `rejected`, `cancelled` or `failed`.
-This initial queue transport accepts the existing bounded snapshot schema;
-large-archive batching and out-of-order backfill are not implemented yet.
+The queue accepts legacy schema 1 and archive schema 2. Schema 2 repeats the
+cumulative manifest in bounded history packets and supports late backfill.
+The development companion persists packets until a processed receipt is read;
+the public companion release still uses the legacy endpoint.
 
 Worker imports and their receipts commit together. A transaction-scoped row lock
 replaces leases for these bounded imports: a killed worker releases its lock and

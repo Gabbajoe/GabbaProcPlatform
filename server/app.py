@@ -187,6 +187,8 @@ def import_snapshot(did, data):
 
 
 def apply_snapshot(db, did, data):
+    if data.schemaVersion == 2:
+        return apply_archive_batch(db, did, data)
     if data.exportedAt > time.time() + 86400:
         raise HTTPException(422, "Export is dated in the future")
     content = json.dumps(
@@ -224,7 +226,18 @@ def apply_snapshot(db, did, data):
         raise HTTPException(409, "Older snapshot")
     if old and data.sequence == old["sequence"]:
         if old["digest"] != checksum:
-            raise HTTPException(409, "Sequence reused with different content")
+            # A schema-2 import stores the same manifest with an empty history.
+            # Older clients may still send their legacy history for this export.
+            manifest = data.model_dump(
+                exclude_none=True, exclude={"privacy", "name", "realm"}
+            )
+            manifest["segments"] = []
+            manifest_digest = digest(
+                json.dumps(manifest, sort_keys=True, separators=(",", ":"))
+            )
+            if old["digest"] != manifest_digest:
+                raise HTTPException(409, "Sequence reused with different content")
+            apply_segments(db, data)
         db.execute(
             "UPDATE owners SET privacy=?,name=?,realm=? WHERE character=? AND device=?",
             (data.privacy, data.name, data.realm, data.characterId, did),
@@ -268,6 +281,35 @@ def apply_snapshot(db, did, data):
             for r in data.totals
         ],
     )
+    apply_segments(db, data)
+    return {"status": "accepted", "review": status, "sequence": data.sequence}
+
+
+def apply_segments(db, data, backfill=False):
+    key = (data.characterId, data.collectionId)
+    cached = db.execute(
+        "SELECT data FROM archive_usage WHERE character=? AND collection=?", key
+    ).fetchone()
+    sums = (
+        {(spell, area): values for spell, area, values in json.loads(cached["data"])}
+        if cached
+        else {}
+    )
+
+    def accumulate(segment, sign):
+        for event in segment["rows"]:
+            v = sums.setdefault((event["spellId"], segment["group"]), [0, 0, 0.0])
+            v[0] += sign * event["procs"]
+            if event["eligible"]:
+                v[1] += sign * event["procs"]
+                v[2] += sign * segment["seconds"]
+
+    if cached is None:
+        # One-time lazy index rebuild for existing/migrated collections.
+        for row in db.execute(
+            "SELECT data FROM segments WHERE character=? AND collection=?", key
+        ):
+            accumulate(json.loads(row["data"]), 1)
     for segment in data.segments:
         previous = db.execute(
             "SELECT sequence,data FROM segments WHERE character=? AND collection=? AND id=?",
@@ -275,6 +317,12 @@ def apply_snapshot(db, did, data):
         ).fetchone()
         value = segment.model_dump()
         if previous:
+            if (
+                backfill
+                and previous["sequence"] > data.sequence
+                and value["status"] == "active"
+            ):
+                continue
             before = json.loads(previous["data"])
             if before == value:
                 continue
@@ -295,12 +343,105 @@ def apply_snapshot(db, did, data):
                 )
             ):
                 raise HTTPException(409, "Segment counters decreased")
+        if previous:
+            accumulate(before, -1)
+        accumulate(value, 1)
         db.execute(
             "INSERT INTO segments VALUES(?,?,?,?,?) ON CONFLICT(character,collection,id) "
             "DO UPDATE SET sequence=excluded.sequence,data=excluded.data",
             (*key, segment.id, data.sequence, json.dumps(value)),
         )
-    return {"status": "accepted", "review": status, "sequence": data.sequence}
+    current = {
+        (r["spell"], r["area"]): r
+        for r in db.execute(
+            "SELECT * FROM totals WHERE character=? AND collection=?", key
+        )
+    }
+    for k, v in sums.items():
+        r = current.get(k)
+        if (
+            not r
+            or v[0] > r["procs"]
+            or v[1] > r["combat"]
+            or v[2] > r["seconds"] + 0.01
+        ):
+            raise HTTPException(409, "Combined archive exceeds cumulative totals")
+    db.execute(
+        "INSERT INTO archive_usage VALUES(?,?,?) ON CONFLICT(character,collection) DO UPDATE SET data=excluded.data",
+        (
+            *key,
+            json.dumps(
+                [(spell, area, values) for (spell, area), values in sums.items()]
+            ),
+        ),
+    )
+    return sums
+
+
+def apply_archive_batch(db, did, data):
+    """Each batch repeats the cumulative manifest; only its history is paginated.
+
+    Totals are never added together. Older batches may fill history gaps without
+    changing the latest totals or character visibility.
+    """
+    if data.exportedAt > time.time() + 86400:
+        raise HTTPException(422, "Export is dated in the future")
+    lock(db, "device:" + did)
+    lock(db, "character:" + data.characterId)
+    key = (data.characterId, data.collectionId)
+    owner = db.execute(
+        "SELECT device FROM owners WHERE character=?", (data.characterId,)
+    ).fetchone()
+    if owner and owner["device"] != did:
+        raise HTTPException(409, "Character belongs to another upload device")
+    if not db.execute(
+        "SELECT id FROM devices WHERE id=? AND revoked=0", (did,)
+    ).fetchone():
+        raise HTTPException(401, "Upload token revoked")
+    old = db.execute(
+        "SELECT * FROM snapshots WHERE character=? AND collection=?", key
+    ).fetchone()
+    manifest = data.model_copy(update={"schemaVersion": 1, "segments": []})
+    if not old or data.sequence > old["sequence"]:
+        result = apply_snapshot(db, did, manifest)
+    else:
+        current = {
+            (r["spell"], r["area"]): r
+            for r in db.execute(
+                "SELECT * FROM totals WHERE character=? AND collection=?", key
+            )
+        }
+        incoming = {(r.spellId, r.group): r for r in data.totals}
+        if data.sequence == old["sequence"]:
+            if set(current) != set(incoming) or data.exportedAt != old["exported"]:
+                raise HTTPException(409, "Conflicting archive manifest")
+        for k, row in incoming.items():
+            previous = current.get(k)
+            if (
+                not previous
+                or row.procs > previous["procs"]
+                or row.combatProcs > previous["combat"]
+                or row.combatSeconds > previous["seconds"] + 0.01
+            ):
+                raise HTTPException(409, "Archive manifest exceeds latest totals")
+            if data.sequence == old["sequence"] and (
+                row.procs != previous["procs"]
+                or row.combatProcs != previous["combat"]
+                or abs(row.combatSeconds - previous["seconds"]) > 0.000001
+            ):
+                raise HTTPException(409, "Conflicting archive manifest")
+        result = {
+            "status": "accepted",
+            "review": old["status"],
+            "sequence": data.sequence,
+        }
+    if not old or data.sequence >= old["sequence"]:
+        db.execute(
+            "UPDATE owners SET privacy=?,name=?,realm=? WHERE character=? AND device=?",
+            (data.privacy, data.name, data.realm, data.characterId, did),
+        )
+    apply_segments(db, data, backfill=True)
+    return result
 
 
 @app.post("/api/privacy")

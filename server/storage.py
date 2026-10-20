@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS owners(character TEXT PRIMARY KEY, device TEXT NOT NU
 CREATE TABLE IF NOT EXISTS snapshots(character TEXT NOT NULL REFERENCES owners(character), collection TEXT NOT NULL, sequence INTEGER NOT NULL, digest TEXT NOT NULL, status TEXT NOT NULL, exported INTEGER NOT NULL, updated INTEGER NOT NULL, PRIMARY KEY(character,collection));
 CREATE TABLE IF NOT EXISTS totals(character TEXT NOT NULL, collection TEXT NOT NULL, spell INTEGER NOT NULL, area TEXT NOT NULL, procs INTEGER NOT NULL, combat INTEGER NOT NULL, seconds REAL NOT NULL, PRIMARY KEY(character,collection,spell,area), FOREIGN KEY(character,collection) REFERENCES snapshots(character,collection) ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS segments(character TEXT NOT NULL, collection TEXT NOT NULL, id INTEGER NOT NULL, sequence INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY(character,collection,id), FOREIGN KEY(character,collection) REFERENCES snapshots(character,collection) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS archive_usage(character TEXT NOT NULL, collection TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY(character,collection), FOREIGN KEY(character,collection) REFERENCES snapshots(character,collection) ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS limits(key TEXT PRIMARY KEY, started INTEGER NOT NULL, count INTEGER NOT NULL);
 """
         if postgres_enabled():

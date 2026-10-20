@@ -4,7 +4,8 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-pub const MAX_FILE: usize = 8 * 1024 * 1024;
+pub mod outbox;
+pub const MAX_FILE: usize = 64 * 1024 * 1024;
 struct Parser<'a> {
     b: &'a [u8],
     p: usize,
@@ -109,7 +110,7 @@ impl<'a> Parser<'a> {
     fn value(&mut self, depth: usize) -> Result<Value> {
         self.ws();
         self.nodes += 1;
-        if depth > 40 || self.nodes > 250000 {
+        if depth > 40 || self.nodes > 4_000_000 {
             return Err("Export structure exceeds limits".into());
         }
         match self.b.get(self.p).copied() {
@@ -197,7 +198,7 @@ impl<'a> Parser<'a> {
 }
 pub fn parse(raw: &str) -> Result<Value> {
     if raw.len() > MAX_FILE {
-        return Err("SavedVariables exceeds 8 MiB".into());
+        return Err("SavedVariables exceeds 64 MiB; archive retained locally".into());
     }
     let raw = raw.strip_prefix('\u{feff}').unwrap_or(raw);
     let mut p = Parser {
@@ -282,7 +283,10 @@ pub fn known() -> HashSet<u64> {
 /// Build a fresh allowlisted DTO. Raw names, paths, zones, stamps and effect names
 /// cannot leak through anonymous mode; executable Lua is never evaluated.
 pub fn payload(root: &Value, named: bool) -> Result<Value> {
-    let e = &root["export"];
+    snapshot_payload(&root["export"], named, false)
+}
+
+fn snapshot_payload(e: &Value, named: bool, archive: bool) -> Result<Value> {
     if integer(&e["schemaVersion"])? != 1 {
         return Err("Unsupported or missing export; export in the addon first".into());
     }
@@ -319,7 +323,12 @@ pub fn payload(root: &Value, named: bool) -> Result<Value> {
         return Err("No supported measurements to upload".into());
     }
     let mut segments = Vec::new();
-    for s in entries(&e["history"])? {
+    let history = if archive && e["archiveVersion"] == 1 {
+        &e["archiveHistory"]
+    } else {
+        &e["history"]
+    };
+    for s in entries(history)? {
         let counts = object(&s["counts"])?;
         let effects = object(&s["effects"])?;
         let mut keys: HashSet<String> = counts.keys().cloned().collect();
@@ -344,7 +353,7 @@ pub fn payload(root: &Value, named: bool) -> Result<Value> {
         }
         segments.push(json!({"id":integer(&s["id"])?,"group":group(&s["context"])?,"seconds":number(&s["duration"])?,"status":status,"rows":rows}));
     }
-    if segments.len() > 301 {
+    if !archive && segments.len() > 301 {
         return Err("Too many segments".into());
     }
     let mut result = json!({"schemaVersion":1,"addonVersion":version,"characterId":uuid(&e["characterId"])?,"collectionId":uuid(&e["collectionId"])?,"sequence":integer(&e["sequence"])?,"exportedAt":integer(&e["exportedAt"])?,"privacy":if named{"named"}else{"anonymous"},"historyTruncated":e["historyTruncated"].as_bool().ok_or("Invalid history flag")?,"totals":totals,"segments":segments});
@@ -362,6 +371,61 @@ pub fn payload(root: &Value, named: bool) -> Result<Value> {
     }
     Ok(result)
 }
+/// Version 2 batches repeat cumulative totals and carry bounded history pages.
+/// Reset collections are uploaded too; their counters are separate collections.
+pub fn payload_batches(root: &Value, named: bool) -> Result<Vec<Value>> {
+    let mut exports = if root.get("archivedExports").is_some() {
+        entries(&root["archivedExports"])?
+    } else {
+        Vec::new()
+    };
+    exports.push(&root["export"]);
+    let mut batches = Vec::new();
+    for e in exports {
+        if entries(&e["totals"])?.is_empty() {
+            continue;
+        }
+        let mut p = snapshot_payload(e, named, true)?;
+        p["schemaVersion"] = json!(2);
+        if e["archiveVersion"] == 1 {
+            p["historyTruncated"] = json!(e["archiveTruncated"]
+                .as_bool()
+                .ok_or("Invalid archive flag")?);
+        }
+        let segments = p["segments"].as_array_mut().ok_or("Invalid segments")?;
+        let segments = std::mem::take(segments);
+        let mut page = Vec::new();
+        let mut bytes = serde_json::to_vec(&p)
+            .map_err(|_| "Cannot encode manifest")?
+            .len();
+        let base = bytes;
+        for segment in segments {
+            let size = serde_json::to_vec(&segment)
+                .map_err(|_| "Cannot encode segment")?
+                .len()
+                + 1;
+            if size + base > 256 * 1024 {
+                return Err("Segment exceeds upload packet limit".into());
+            }
+            if !page.is_empty() && (page.len() >= 100 || bytes + size > 256 * 1024) {
+                let mut packet = p.clone();
+                packet["segments"] = json!(page);
+                batches.push(packet);
+                page = Vec::new();
+                bytes = base;
+            }
+            bytes += size;
+            page.push(segment);
+        }
+        p["segments"] = json!(page);
+        batches.push(p);
+    }
+    if batches.is_empty() {
+        return Err("No measurements to upload".into());
+    }
+    Ok(batches)
+}
+
 pub fn read_file(path: &Path) -> Result<Value> {
     if path.file_name().and_then(|v| v.to_str()) != Some("GabbaProcTracker.lua") {
         return Err("Select GabbaProcTracker.lua".into());
@@ -699,5 +763,49 @@ mod tests {
     fn windows_byte_escapes() {
         let v = parse(r#"GabbaProcTrackerDB = {x="J\195\164ger"}"#).unwrap();
         assert_eq!(v["x"], "Jäger");
+    }
+}
+
+#[cfg(test)]
+mod archive_tests {
+    use super::*;
+    #[test]
+    fn pages_include_full_archive_and_reset_collections_without_names() {
+        let mut history = Map::new();
+        for i in 1..=450 {
+            history.insert(i.to_string(), json!({"id":i,"context":"world","duration":1.0,"status":"complete","counts":{"20007":1},"effects":{"20007":true}}));
+        }
+        let export = json!({"schemaVersion":1,"addonVersion":"0.1.1","characterId":"12345678-1234-4234-8234-123456789abc","collectionId":"22345678-1234-4234-8234-123456789abc","sequence":4,"exportedAt":1792320000,"historyTruncated":true,"archiveVersion":1,"archiveTruncated":false,"character":{"name":"Secretname","realm":"Secretrealm"},"totals":{"1":{"spellId":20007,"group":"world","procs":450,"combatProcs":450,"combatSeconds":450.0}},"history":{},"archiveHistory":history});
+        let mut old = export.clone();
+        old["collectionId"] = json!("32345678-1234-4234-8234-123456789abc");
+        let root = json!({"export":export,"archivedExports":{"1":old}});
+        let packets = payload_batches(&root, false).unwrap();
+        assert_eq!(packets.len(), 10);
+        assert_eq!(
+            packets
+                .iter()
+                .map(|p| p["segments"].as_array().unwrap().len())
+                .sum::<usize>(),
+            900
+        );
+        for p in &packets {
+            assert_eq!(p["schemaVersion"], 2);
+            assert_eq!(p["historyTruncated"], false);
+            assert!(p["segments"].as_array().unwrap().len() <= 100);
+            let bytes = serde_json::to_string(p).unwrap();
+            assert!(bytes.len() <= 256 * 1024);
+            assert!(!bytes.contains("Secret"));
+        }
+    }
+    #[test]
+    fn upload_body_is_paced_and_exact() {
+        use std::io::Read;
+        let bytes = vec![42; 32 * 1024];
+        let mut limited = outbox::LimitedReader::new(bytes.clone(), 128);
+        let start = std::time::Instant::now();
+        let mut received = Vec::new();
+        limited.read_to_end(&mut received).unwrap();
+        assert_eq!(received, bytes);
+        assert!(start.elapsed() >= std::time::Duration::from_millis(240));
     }
 }

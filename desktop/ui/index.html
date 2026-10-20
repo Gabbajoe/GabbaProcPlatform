@@ -7,6 +7,9 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <p id="localBuild" hidden data-t="localBuild">
+      Local test build: uploads go only to the local test server.
+    </p>
     <header>
       <img src="logo.png" alt="" />
       <div>
@@ -58,10 +61,26 @@
             >Automatically install signed app updates (app restarts)</span
           ></label
         >
-        <label><span data-t="interval">Upload interval</span><select id="interval"></select></label>
+        <label
+          ><span data-t="interval">Upload interval</span
+          ><select id="interval"></select
+        ></label>
+        <label
+          ><span data-t="bandwidth">Upload bandwidth</span
+          ><select id="bandwidth">
+            <option value="0" data-t="unlimited">Unlimited</option>
+            <option value="64">64 KiB/s</option>
+            <option value="128">128 KiB/s</option>
+            <option value="256">256 KiB/s</option>
+            <option value="512">512 KiB/s</option>
+            <option value="1024">1,024 KiB/s</option>
+          </select></label
+        >
         <p data-t="running">
-          Closing the window keeps the app running in the tray. Use the tray menu
-          or Quit app to exit completely. Without an available tray, closing quits the app. Anonymity does not remove copies of previously public names.
+          Closing the window keeps the app running in the tray. Use the tray
+          menu or Quit app to exit completely. Without an available tray,
+          closing quits the app. Anonymity does not remove copies of previously
+          public names.
         </p>
         <button id="upload" data-t="upload">Upload selected characters</button
         ><button id="update" data-t="update">Check for updates</button>
@@ -83,7 +102,8 @@
         </button>
       </details>
       <footer>
-        0.1.1 · MIT · gabbaproc.kellerkind.info<br /><span data-t="source"
+        <span id="appVersion">0.1.1</span> · MIT · gabbaproc.kellerkind.info<br /><span
+          data-t="source"
           >Source & releases: github.com/Gabbajoe/GabbaProcPlatform</span
         >
       </footer>
