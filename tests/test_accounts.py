@@ -449,5 +449,6 @@ def test_email_html_link_and_plaintext(monkeypatch):
     assert parse_qs(parsed.fragment) == {
         "emailChallenge": ["A" * 43],
         "emailCode": ["01234567"],
+        "emailAddress": ["person@example.org"],
     }
     assert link in plain and "<img" not in html and "<script" not in html

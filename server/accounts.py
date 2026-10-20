@@ -350,7 +350,9 @@ def send_code(address, code, state):
     link = (
         origin()
         + "/account.html#"
-        + urlencode({"emailChallenge": state, "emailCode": code})
+        + urlencode(
+            {"emailChallenge": state, "emailCode": code, "emailAddress": address}
+        )
     )
     message = signin_message(address, code, link)
     with smtplib.SMTP(

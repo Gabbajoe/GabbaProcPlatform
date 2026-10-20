@@ -21,6 +21,11 @@
       challenge = linkedChallenge;
       el("email-verify").hidden = false;
       el("login-code").value = linkedCode;
+      const linkedAddress = emailLink.get("emailAddress") || "";
+      if (linkedAddress.length <= 254) {
+        el("login-email").value = linkedAddress;
+        if (!el("login-email").checkValidity()) el("login-email").value = "";
+      }
       status(
         "Code filled in. Confirm it below in the browser where you requested it.",
         "Code eingefügt. Bitte unten in dem Browser bestätigen, in dem du ihn angefordert hast.",
