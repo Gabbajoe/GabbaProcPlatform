@@ -126,9 +126,9 @@ select:focus-visible {
   font-size: 22px;
   letter-spacing: -0.5px;
 }
-.brand span {
-  color: var(--gold);
-}
+.brand .brand-proc { color: #6ab3ff; }
+.brand-copy { display: flex; flex-direction: column; line-height: 1.15; }
+.brand-copy small { margin-top: 3px; font-size: 11px; font-weight: 400; letter-spacing: .3px; color: var(--muted); }
 .brand:hover {
   text-decoration: none;
 }
@@ -787,3 +787,9 @@ code {
 .analysis-bar meter::-webkit-meter-bar { background: #293b52; border: 0; }
 .analysis-bar meter::-webkit-meter-optimum-value { background: #6ab3ff; }
 .analysis-bar meter::-moz-meter-bar { background: #6ab3ff; }
+/* Manual export preview stays within the content panel on small screens. */
+#export-preview { max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+#export-progress { width: 100%; accent-color: #6ab3ff; }
+#export-file { max-width: 100%; }
+#export-named { width: auto; margin: 0; }
+label:has(> #export-named) { display: inline-flex; align-items: center; gap: 8px; }

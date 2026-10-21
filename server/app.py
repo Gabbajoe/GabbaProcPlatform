@@ -37,7 +37,7 @@ async def headers(request, call_next):
             "X-Content-Type-Options": "nosniff",
             "Referrer-Policy": "no-referrer",
             "Cache-Control": "no-store",
-            "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+            "Content-Security-Policy": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
             "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
         }
     )
@@ -560,3 +560,55 @@ def portal_page(page: str):
     if page not in {"analysis", "compare", "quality", "downloads", "account", "imprint", "privacy"}:
         raise HTTPException(404, "Page not found")
     return FileResponse(ROOT / (page + ".html"))
+
+
+def browser_upload_device(aid, character):
+    """Keep ownership with an existing linked device; never claim another user's data."""
+    with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        lock(db, "account:" + aid)
+        if not db.execute("SELECT id FROM accounts WHERE id=?", (aid,)).fetchone():
+            raise HTTPException(401, "Sign in required")
+        owner = db.execute("SELECT device FROM owners WHERE character=?", (character,)).fetchone()
+        if owner:
+            row = db.execute("SELECT d.id FROM devices d JOIN account_devices a ON a.device=d.id WHERE d.id=? AND a.account=? AND d.revoked=0", (owner['device'], aid)).fetchone()
+            if not row:
+                raise HTTPException(409, "Link the existing upload access to this account first")
+            return row['id']
+        linked = db.execute("SELECT d.id FROM devices d JOIN account_devices a ON a.device=d.id WHERE a.account=? AND d.revoked=0 ORDER BY d.created,d.id LIMIT 1", (aid,)).fetchone()
+        if linked:
+            return linked['id']
+        # A stable account-owned upload identity makes retries and later uploads idempotent.
+        did = digest("browser-upload:" + aid)[:32]
+        existing = db.execute("SELECT revoked FROM devices WHERE id=?", (did,)).fetchone()
+        if existing and existing['revoked']:
+            raise HTTPException(409, "Browser upload access was revoked")
+        if not existing:
+            db.execute("INSERT INTO devices(id,token_hash,created) VALUES(?,?,?)", (did, "browser-only:" + digest(secrets.token_urlsafe(32)), int(time.time())))
+            accounts.attach(db, aid, did)
+        db.commit()
+        return did
+
+
+@app.post("/api/account/upload-jobs", status_code=202)
+async def browser_upload(request: Request):
+    accounts.same_origin(request)
+    aid = await run_in_threadpool(accounts.session, request)
+    await run_in_threadpool(rate, "browser-uploads:" + aid, 600)
+    try:
+        data = Upload.model_validate(await body(request))
+    except (ValidationError, ValueError):
+        raise HTTPException(422, "Invalid export fields, counters or history")
+    did = await run_in_threadpool(browser_upload_device, aid, data.characterId)
+    return await run_in_threadpool(upload_queue.enqueue, did, data)
+
+
+@app.get("/api/account/upload-jobs/{job_id}")
+def browser_upload_status(request: Request, job_id: str):
+    aid = accounts.session(request)
+    rate("browser-status:" + aid, 3600)
+    with connect() as db:
+        row = db.execute("SELECT j.device FROM upload_jobs j JOIN account_devices a ON a.device=j.device WHERE j.id=? AND a.account=?", (job_id, aid)).fetchone()
+    if not row:
+        raise HTTPException(404, "Upload not found")
+    return upload_queue.get_status(row['device'], job_id)

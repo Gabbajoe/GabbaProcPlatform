@@ -803,10 +803,18 @@ def poll_pair(request, body):
             result = {"status": "linked", "deviceId": row["device"]}
         else:
             token, did = secrets.token_urlsafe(32), secrets.token_hex(16)
-            db.execute(
-                "INSERT INTO devices(id,token_hash,created) VALUES(?,?,?)",
-                (did, digest(token), int(time.time())),
-            )
+            browser_id = digest("browser-upload:" + row["account"])[:32]
+            browser = db.execute("SELECT d.id FROM devices d JOIN account_devices a ON a.device=d.id WHERE d.id=? AND a.account=? AND d.revoked=0 AND d.token_hash LIKE ?", (browser_id, row["account"], "browser-only:%")).fetchone()
+            if browser:
+                # First companion inherits browser uploads without changing their ownership.
+                did = browser_id
+                lock(db, "device:" + did)
+                db.execute("UPDATE devices SET token_hash=? WHERE id=?", (digest(token), did))
+            else:
+                db.execute(
+                    "INSERT INTO devices(id,token_hash,created) VALUES(?,?,?)",
+                    (did, digest(token), int(time.time())),
+                )
             attach(db, row["account"], did)
             result = {"status": "linked", "token": token, "deviceId": did}
         db.execute("DELETE FROM device_links WHERE hash=?", (digest(code),))

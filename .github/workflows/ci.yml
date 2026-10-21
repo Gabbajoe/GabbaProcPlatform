@@ -39,6 +39,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       - run: cargo test --locked -p gabbaproc-core
         working-directory: desktop
+      - run: rustup target add wasm32-unknown-unknown
+      - run: bash tools/build-browser-parser.sh
+      - run: node tests/browser_parser.cjs
   desktop:
     runs-on: ubuntu-22.04
     steps:

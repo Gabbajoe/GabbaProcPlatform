@@ -575,3 +575,65 @@ def test_disconnect_reconnect_keeps_device_and_rotates_token(clients):
             a.post("/api/imports", headers=new, json=payload).json()["status"]
             == "duplicate"
         )
+
+
+def test_browser_upload_session_ownership_and_companion_handoff(clients, monkeypatch):
+    import uuid, time
+    from server.app import import_snapshot
+    from server import upload_queue
+    a, b, sent = clients
+    packet = {'schemaVersion': 2, 'addonVersion': '0.1.3',
+        'characterId': str(uuid.uuid4()), 'collectionId': str(uuid.uuid4()),
+        'sequence': 1, 'exportedAt': int(time.time()), 'privacy': 'anonymous',
+        'historyTruncated': False, 'segments': [],
+        'totals': [{'spellId': 20007, 'group': 'world', 'procs': 1,
+                    'combatProcs': 1, 'combatSeconds': 60.0}]}
+    imported=[]
+    def enqueue(did, data):
+        imported.append(did)
+        import_snapshot(did, data)
+        return {'jobId':'test-job', 'status':'processed'}
+    monkeypatch.setattr(upload_queue, 'enqueue', enqueue)
+    assert a.post('/api/account/upload-jobs',json=packet).status_code==401
+    signin(a,sent)
+    assert a.post('/api/account/upload-jobs',json=packet,headers={'Origin':'https://evil.example'}).status_code==403
+    assert a.post('/api/account/upload-jobs',json=packet).status_code==202
+    browser_id=imported[-1]
+    assert a.post('/api/account/upload-jobs',json=packet).status_code==202
+    assert imported[-1]==browser_id
+    signin(b,sent,'other@example.org')
+    assert b.post('/api/account/upload-jobs',json=packet).status_code==409
+    assert b.get('/api/account/upload-jobs/test-job').status_code==404
+    pair=b.post('/api/device-link/start').json()
+    assert a.post('/api/device-link/approve',json={'userCode':pair['userCode']}).status_code==200
+    result=b.post('/api/device-link/poll',json={'deviceCode':pair['deviceCode']}).json()
+    assert result['deviceId']==browser_id
+    assert b.post('/api/imports',json=packet,headers={'Authorization':'Bearer '+result['token']}).status_code==200
+    # Another pairing must not rotate the first companion's access.
+    pair=b.post('/api/device-link/start').json()
+    assert a.post('/api/device-link/approve',json={'userCode':pair['userCode']}).status_code==200
+    second=b.post('/api/device-link/poll',json={'deviceCode':pair['deviceCode']}).json()
+    assert second['deviceId']!=browser_id
+    assert b.post('/api/imports',json=packet,headers={'Authorization':'Bearer '+result['token']}).status_code==200
+
+
+@pytest.mark.skipif(not os.environ.get('GABBAPROC_TEST_DATABASE_URL'), reason='PostgreSQL queue required')
+def test_browser_queue_receipts_are_account_scoped(clients):
+    import uuid, time
+    from server import upload_queue
+    a,b,sent=clients
+    signin(a,sent)
+    packet={'schemaVersion':2,'addonVersion':'0.1.3','characterId':str(uuid.uuid4()),
+        'collectionId':str(uuid.uuid4()),'sequence':1,'exportedAt':int(time.time()),
+        'privacy':'anonymous','historyTruncated':False,'segments':[],
+        'totals':[{'spellId':20007,'group':'world','procs':1,'combatProcs':1,'combatSeconds':60.0}]}
+    response=a.post('/api/account/upload-jobs',json=packet)
+    assert response.status_code==202,response.text
+    path='/api/account/upload-jobs/'+response.json()['jobId']
+    assert a.get(path).json()['status']=='queued'
+    assert b.get(path).status_code==401
+    signin(b,sent,'different@example.org')
+    assert b.get(path).status_code==404
+    assert upload_queue.process_one()
+    assert a.get(path).json()['status']=='processed'
+    assert a.post('/api/account/upload-jobs',json=packet).json()['status']=='processed'

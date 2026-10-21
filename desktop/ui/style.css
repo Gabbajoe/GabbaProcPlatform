@@ -400,3 +400,8 @@ select option { background: #172235; color: #edf5ff; }
 .top-bar .tabs button:hover { background: #315779; }
 .top-bar .tabs button[aria-selected="true"] { background: #37658e; border-color: #8ac8ff; color: white; }
 .global-status pre { font-family: inherit; font-size: 13px; line-height: 1.5; }
+
+/* Shared GabbaProc branding. */
+.brand .brand-proc { color: #6ab3ff; }
+.brand:hover h1 { color: inherit; }
+header .brand-tagline { display: block; margin: 3px 0 0; font-size: 11px; letter-spacing: .3px; color: #a9bbd1; }

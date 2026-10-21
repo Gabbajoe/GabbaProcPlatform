@@ -82,3 +82,18 @@ Companion 0.1.3 imports addon export schemas 1 and 2. New segment telemetry is p
 [Combat analysis](https://gabbaproc.kellerkind.info/analysis.html) shows environment rates, duration groups, zero-proc proportions, count distribution, duration/proc scatter and relative timing histograms. Scope can be community or the signed-in account. The initial view scans at most 500 recent archived segments to bound server work; it is not an all-history aggregation. Rates use total eligible seconds, not averages of per-segment rates. Damage-event counts are not effect-specific trigger attempts. Timing summaries exclude truncated combat detail; sampled buffs do not establish exact uptime. Further controlled raid validation is required.
 
 Language is configured under Settings: System language (English fallback), Deutsch or English. The header displays the connected account. Header/footer span the window width; the desktop window has a fixed 920 × 780 size.
+
+### Manual browser uploads
+
+Signed-in users can upload a character's SavedVariables file at `/upload.html`.
+A dedicated worker runs the same Rust parser and allowlist projection as the
+companion, compiled to WebAssembly. The original file never leaves the browser.
+Uploads require an explicit confirmation after a pseudonymous/named preview and
+use the existing bounded server queue, validation and import receipts.
+Existing linked character ownership is retained; unrelated accounts cannot claim it.
+The first companion paired after a browser-only upload inherits that upload identity.
+
+Rebuild the committed browser parser after changing the Rust core:
+`rustup target add wasm32-unknown-unknown`, then `bash tools/build-browser-parser.sh`.
+The server CSP permits only same-origin workers and WebAssembly compilation
+(`wasm-unsafe-eval`); it does not allow JavaScript `eval` or execution of uploaded Lua.

@@ -1,0 +1,10 @@
+[package]
+name = "gabbaproc-browser-parser"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+[lib]
+crate-type = ["cdylib"]
+[dependencies]
+gabbaproc-core = { path = "../core" }
+serde_json = "1"
