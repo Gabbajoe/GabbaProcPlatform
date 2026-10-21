@@ -52,7 +52,7 @@ const de = {
   systemLanguage: "Systemsprache",
   closeToTray: "Beim Schließen in den Infobereich minimieren",
   startup: "Bei der Anmeldung starten",
-  updates: "Signierte App-Updates automatisch installieren (App startet neu)",
+  updates: "Updates automatisch installieren (App wird neu gestartet)",
   running:
     "Wenn aktiviert, wird das Fenster beim Schließen im Infobereich ausgeblendet. Ohne verfügbaren Infobereich beendet das Schließen die App.",
   upload: "Ausgewählte Charaktere hochladen",
