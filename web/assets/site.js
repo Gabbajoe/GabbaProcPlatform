@@ -368,6 +368,8 @@ function renderHeaderAccount() {
 }
 window.addEventListener("gabbaproc-account", (event) => {
   headerAccount = event.detail;
+  window.gabbaprocAccount = headerAccount;
+  window.gabbaprocAccountReady = true;
   renderHeaderAccount();
 });
 new MutationObserver(renderHeaderAccount).observe(document.documentElement, {
@@ -379,7 +381,6 @@ if (!$("account-login"))
   fetch("/api/account")
     .then((r) => (r.ok ? r.json() : null))
     .then((account) => {
-      headerAccount = account;
-      renderHeaderAccount();
+      window.dispatchEvent(new CustomEvent("gabbaproc-account", { detail: account }));
     })
     .catch(() => {});

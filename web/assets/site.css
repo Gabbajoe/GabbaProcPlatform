@@ -127,7 +127,7 @@ select:focus-visible {
   letter-spacing: -0.5px;
 }
 .brand .brand-proc { color: #6ab3ff; }
-.brand-copy { display: flex; flex-direction: column; line-height: 1.15; }
+.brand-copy { color: var(--text); display: flex; flex-direction: column; line-height: 1.15; }
 .brand-copy small { margin-top: 3px; font-size: 11px; font-weight: 400; letter-spacing: .3px; color: var(--muted); }
 .brand:hover {
   text-decoration: none;
@@ -793,3 +793,12 @@ code {
 #export-file { max-width: 100%; }
 #export-named { width: auto; margin: 0; }
 label:has(> #export-named) { display: inline-flex; align-items: center; gap: 8px; }
+
+.upload-account { color: #7edbd0; }
+.export-paths { margin: 12px 0 20px; color: var(--muted); font-size: 12px; }
+.export-paths p { margin: 8px 0; }
+.export-paths dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 14px; }
+.export-paths dt { font-weight: 600; }
+.export-paths dd { margin: 0; overflow-wrap: anywhere; }
+.export-paths code { white-space: normal; font-size: inherit; }
+@media (max-width: 600px) { .export-paths dl { grid-template-columns: 1fr; gap: 3px; } .export-paths dd { margin-bottom: 8px; } }

@@ -4,6 +4,15 @@
   const tr = (en,de) => document.documentElement.lang === 'de' ? de : en;
   let packets = [], worker, generation=0, busy=false;
   const show = text => $('export-status').textContent=text;
+  function renderAccount() {
+    const account=window.gabbaprocAccount;
+    $('export-signin').hidden=!window.gabbaprocAccountReady || !!account;
+    $('export-account').hidden=!account;
+    $('export-account').textContent=account ? (account.username ? tr('Signed in as ','Angemeldet als ')+account.username : tr('Signed in — ready to upload.','Angemeldet — bereit zum Hochladen.')) : '';
+  }
+  window.addEventListener('gabbaproc-account',renderAccount);
+  new MutationObserver(renderAccount).observe(document.documentElement,{attributes:true,attributeFilter:['lang']});
+  renderAccount();
   async function prepare() {
     const current = ++generation;
     worker?.terminate(); packets=[]; $('export-upload').disabled=true; $('export-progress').hidden=true;

@@ -9,9 +9,9 @@
     />
     <title>GabbaProc · Upload</title>
     <link rel="icon" href="/assets/logo.png" />
-    <link rel="stylesheet" href="/assets/site.css" />
-    <script src="/assets/site.js" defer></script>
-  <script src="/assets/upload.js" defer></script>
+    <link rel="stylesheet" href="/assets/site.css?v=d50ad5e87dca" />
+    <script src="/assets/site.js?v=e345e7368ca2" defer></script>
+  <script src="/assets/upload.js?v=ba7f9c4541fb" defer></script>
 </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
@@ -84,9 +84,19 @@
 
 <section class="panel">
 <p data-en="Export in WoW, then /reload or log out. Select your character’s SavedVariables/GabbaProcTracker.lua file. It is read locally in your browser; only the previewed, filtered data is sent after you click Upload." data-de="In WoW exportieren, dann /reload oder ausloggen. Wähle die SavedVariables/GabbaProcTracker.lua deines Charakters. Die Datei wird lokal im Browser gelesen; erst nach Klick auf Hochladen werden die gefilterten Daten aus der Vorschau gesendet.">Export in WoW, then /reload or log out. Select your character’s SavedVariables/GabbaProcTracker.lua file. It is read locally in your browser; only the previewed, filtered data is sent after you click Upload.</p>
-<p><a href="/account.html" data-en="Sign in to upload" data-de="Zum Hochladen anmelden">Sign in to upload</a></p>
+<p id="export-signin" hidden><a href="/account.html" data-en="Sign in to upload" data-de="Zum Hochladen anmelden">Sign in to upload</a></p>
+<p id="export-account" class="upload-account" hidden></p>
 <label for="export-file" data-en="Export file (maximum 64 MiB)" data-de="Exportdatei (maximal 64 MiB)">Export file (maximum 64 MiB)</label>
 <input type="file" id="export-file" accept=".lua" />
+<div class="export-paths">
+<p data-en="Typical file locations (replace ACCOUNT, REALM and CHARACTER with your folders):" data-de="Typische Dateipfade (ACCOUNT, REALM und CHARACTER durch deine Ordner ersetzen):">Typical file locations (replace ACCOUNT, REALM and CHARACTER with your folders):</p>
+<dl>
+<dt>Windows</dt><dd><code>C:\Program Files (x86)\World of Warcraft\_classic_era_\WTF\Account\ACCOUNT\REALM\CHARACTER\SavedVariables\GabbaProcTracker.lua</code></dd>
+<dt>macOS</dt><dd><code>/Applications/World of Warcraft/_classic_era_/WTF/Account/ACCOUNT/REALM/CHARACTER/SavedVariables/GabbaProcTracker.lua</code></dd>
+<dt>Linux · Faugus</dt><dd><code>~/Faugus/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/WTF/Account/ACCOUNT/REALM/CHARACTER/SavedVariables/GabbaProcTracker.lua</code></dd>
+</dl>
+<p data-en="Your installation folder may differ. On Linux, look inside your Wine/Lutris/Bottles prefix. Choose the file under the character folder, not the account-wide SavedVariables folder." data-de="Dein Installationsordner kann abweichen. Unter Linux im Wine-/Lutris-/Bottles-Prefix nachsehen. Wähle die Datei im Charakterordner, nicht im accountweiten SavedVariables-Ordner.">Your installation folder may differ. On Linux, look inside your Wine/Lutris/Bottles prefix. Choose the file under the character folder, not the account-wide SavedVariables folder.</p>
+</div>
 <p><label><input type="checkbox" id="export-named" /> <span data-en="Publish character name and realm" data-de="Charaktername und Realm veröffentlichen">Publish character name and realm</span></label></p>
 <p data-en="Unchecked: pseudonymous upload. Previously published names are not removed by this choice; use the privacy controls to hide them." data-de="Ohne Häkchen: pseudonymer Upload. Bereits veröffentlichte Namen werden dadurch nicht entfernt; dafür die Datenschutz-Funktion verwenden.">Unchecked: pseudonymous upload. Previously published names are not removed by this choice; use the privacy controls to hide them.</p>
 <p id="export-summary"></p>
