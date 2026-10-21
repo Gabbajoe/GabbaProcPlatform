@@ -45,6 +45,7 @@ Diese URLs exakt übernehmen, ohne abschließenden Slash oder Wildcards:
 
 | Anbieter | Callback / Redirect URI |
 | --- | --- |
+| Battle.net | `https://gabbaproc.kellerkind.info/api/auth/battlenet/callback` |
 | Discord | `https://gabbaproc.kellerkind.info/api/auth/discord/callback` |
 | GitHub | `https://gabbaproc.kellerkind.info/api/auth/github/callback` |
 | Google | `https://gabbaproc.kellerkind.info/api/auth/google/callback` |
@@ -215,3 +216,25 @@ Technische Grundlage für den Geräteablauf: [RFC 8628](https://www.rfc-editor.o
 **Als Erstes kannst du Discord und GitHub anlegen.** Danach reichen die Nachricht
 „Discord/GitHub angelegt“ und der private Speicherort der Zugangsdaten, um die
 Integration und den ersten vollständigen Verbindungstest fortzusetzen.
+
+
+## Battle.net
+
+Register a web client at https://community.developer.battle.net/access/clients.
+Redirect URI: `https://gabbaproc.kellerkind.info/api/auth/battlenet/callback`.
+Configure `GABBAPROC_BATTLENET_CLIENT_ID` and
+`GABBAPROC_BATTLENET_CLIENT_SECRET` (or their `_FILE` variants).
+Until both values are configured, the provider remains hidden and unavailable.
+
+The server requests only `openid`, reads the stable `sub` and BattleTag from
+userinfo and discards provider tokens. It requests no WoW character/profile
+permissions. Linking uses the existing explicit account-linking flow.
+Companion pairing continues through the same browser account.
+
+References: https://community.developer.battle.net/documentation/guides/using-oauth
+and https://oauth.battle.net/.well-known/openid-configuration.
+
+Deployment: add `deploy/compose.battlenet.yaml` after the accounts overlay only
+once both credential files are present in `GABBAPROC_CONFIG_DIR`.
+Local private files: `.secrets/battlenet-client-id` and
+`.secrets/battlenet-client-secret` (ignored by Git, mode 0600).

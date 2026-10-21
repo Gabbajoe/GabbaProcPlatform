@@ -1,0 +1,9 @@
+# Optional: add after compose.accounts.yaml once both private files exist.
+services:
+  api:
+    environment:
+      GABBAPROC_BATTLENET_CLIENT_ID_FILE: /run/private/battlenet-client-id
+      GABBAPROC_BATTLENET_CLIENT_SECRET_FILE: /run/private/battlenet-client-secret
+    volumes:
+      - ${GABBAPROC_CONFIG_DIR}/battlenet-client-id:/run/private/battlenet-client-id:ro
+      - ${GABBAPROC_CONFIG_DIR}/battlenet-client-secret:/run/private/battlenet-client-secret:ro

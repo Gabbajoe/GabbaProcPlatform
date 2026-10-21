@@ -24,6 +24,12 @@ COOKIE = "__Host-gabbaproc-session"
 FLOW_COOKIE = "__Host-gabbaproc-flow"
 SESSION_SECONDS = 14 * 86400
 PROVIDERS = {
+    "battlenet": (
+        "https://oauth.battle.net/authorize",
+        "https://oauth.battle.net/token",
+        "https://oauth.battle.net/userinfo",
+        "openid",
+    ),
     "discord": (
         "https://discord.com/oauth2/authorize",
         "https://discord.com/api/oauth2/token",
@@ -294,7 +300,11 @@ def provider_identity(provider, code, verifier):
             follow_redirects=False,
             headers={"Accept": "application/json", "User-Agent": "GabbaProc"},
         ) as client:
-            response = client.post(PROVIDERS[provider][1], data=fields)
+            if provider == "battlenet":
+                auth = httpx.BasicAuth(fields.pop("client_id"), fields.pop("client_secret"))
+                response = client.post(PROVIDERS[provider][1], data=fields, auth=auth)
+            else:
+                response = client.post(PROVIDERS[provider][1], data=fields)
             response.raise_for_status()
             token = response.json()["access_token"]
             response = client.get(
@@ -302,10 +312,10 @@ def provider_identity(provider, code, verifier):
             )
             response.raise_for_status()
             user = response.json()
-            subject = str(user["id"])
+            subject = str(user["sub"] if provider == "battlenet" else user["id"])
             if not subject.isdecimal():
                 raise ValueError()
-            return subject, str(user.get("username") or user.get("login") or subject)
+            return subject, str(user.get("battletag") or user.get("username") or user.get("login") or subject)
     except (httpx.HTTPError, ValueError, KeyError, TypeError):
         raise HTTPException(502, "Provider sign-in failed; please retry") from None
 

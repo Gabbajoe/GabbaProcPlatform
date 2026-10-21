@@ -119,7 +119,7 @@
       (p) => !account?.identities.some((i) => i.provider === p),
     )) {
       const button = document.createElement("button");
-      const name = provider === "github" ? "GitHub" : "Discord";
+      const name = ({ github: "GitHub", discord: "Discord", battlenet: "Battle.net" })[provider] || provider;
       button.textContent = account
         ? tr("Link " + name, name + " verknüpfen")
         : tr("Sign in with " + name, "Mit " + name + " anmelden");
@@ -161,7 +161,7 @@
       const label = document.createElement("span");
       label.className = "identity-provider";
       label.textContent =
-        { email: "E-Mail", github: "GitHub", discord: "Discord" }[
+        { email: "E-Mail", github: "GitHub", discord: "Discord", battlenet: "Battle.net" }[
           identity.provider
         ] || identity.provider;
       const value = document.createElement("span");

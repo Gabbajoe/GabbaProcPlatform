@@ -637,3 +637,46 @@ def test_browser_queue_receipts_are_account_scoped(clients):
     assert upload_queue.process_one()
     assert a.get(path).json()['status']=='processed'
     assert a.post('/api/account/upload-jobs',json=packet).json()['status']=='processed'
+
+
+def test_battlenet_identity_exchange(clients, monkeypatch):
+    import httpx
+    monkeypatch.setenv("GABBAPROC_BATTLENET_CLIENT_ID", "test-id")
+    monkeypatch.setenv("GABBAPROC_BATTLENET_CLIENT_SECRET", "test-secret")
+    def handler(req):
+        if str(req.url) == "https://oauth.battle.net/token":
+            assert req.headers["authorization"].startswith("Basic ")
+            fields = parse_qs(req.content.decode())
+            assert "client_secret" not in fields
+            assert fields["redirect_uri"] == ["https://testserver/api/auth/battlenet/callback"]
+            return httpx.Response(200, json={"access_token": "test-access"})
+        assert str(req.url) == "https://oauth.battle.net/userinfo"
+        assert req.headers["authorization"] == "Bearer test-access"
+        return httpx.Response(200, json={"sub": "12345", "battletag": "Tester#1234"})
+    original = httpx.Client
+    monkeypatch.setattr(accounts.httpx, "Client",
+        lambda **kw: original(transport=httpx.MockTransport(handler), **kw))
+    assert accounts.provider_identity("battlenet", "code", "verifier") == ("12345", "Tester#1234")
+
+
+def test_battlenet_login_link_and_browser_binding(clients, monkeypatch):
+    a, b, sent = clients
+    assert "battlenet" not in a.get("/api/auth/options").json()["providers"]
+    monkeypatch.setenv("GABBAPROC_BATTLENET_CLIENT_ID", "test-id")
+    monkeypatch.setenv("GABBAPROC_BATTLENET_CLIENT_SECRET", "test-secret")
+    assert "battlenet" in a.get("/api/auth/options").json()["providers"]
+    signin(a, sent)
+    account = a.get("/api/account").json()["id"]
+    monkeypatch.setattr(accounts, "provider_identity", lambda *args: ("12345", "Tester#1234"))
+    start = a.post("/api/auth/battlenet/start", json={"link": True})
+    url = urlparse(start.json()["url"])
+    assert url.scheme == "https" and url.netloc == "oauth.battle.net"
+    query = parse_qs(url.query)
+    assert query["scope"] == ["openid"]
+    callback = "/api/auth/battlenet/callback?code=test&state=" + query["state"][0]
+    assert b.get(callback, follow_redirects=False).headers["location"].endswith("auth=failed")
+    assert a.get(callback, follow_redirects=False).headers["location"] == "/account.html"
+    info = a.get("/api/account").json()
+    assert info["id"] == account
+    assert any(i["provider"] == "battlenet" for i in info["identities"])
+    assert a.get(callback, follow_redirects=False).headers["location"].endswith("auth=failed")
