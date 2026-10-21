@@ -35,7 +35,7 @@ h1 {
 }
 h2 {
   font-size: 18px;
-  color: #f5c974;
+  color: #6ab3ff;
 }
 section,
 details {
@@ -147,7 +147,7 @@ summary {
   background: #101c2d;
 }
 .upload-progress-row strong {
-  color: #f5c974;
+  color: #6ab3ff;
 }
 .progress-privacy {
   display: inline-block;
@@ -405,3 +405,10 @@ select option { background: #172235; color: #edf5ff; }
 .brand .brand-proc { color: #6ab3ff; }
 .brand:hover h1 { color: inherit; }
 header .brand-tagline { display: block; margin: 3px 0 0; font-size: 11px; letter-spacing: .3px; color: #a9bbd1; }
+
+.settings-tabs { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 0 12px; border-bottom: 1px solid #354c68; }
+.settings-tabs button[aria-selected="true"] { background: #37658e; border-color: #6ab3ff; }
+.settings-tabs + section { margin-top: 16px; }
+h3, .brand-proc { color: #6ab3ff; }
+.release-notes { font: inherit; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; padding: 12px; background: #101c2d; border-radius: 6px; }
+.installed-changes { padding-left: 22px; line-height: 1.6; }

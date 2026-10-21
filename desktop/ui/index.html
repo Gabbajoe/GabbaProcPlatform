@@ -181,24 +181,46 @@
         aria-labelledby="tab-settings"
         hidden
       >
-        <section>
-          <h2 data-t="settings">Settings</h2>
-<label><span data-t="languageLabel">Language</span><select id="lang" aria-label="Language"><option value="auto" data-t="systemLanguage">System language</option><option value="de">Deutsch</option><option value="en">English</option></select></label>
-<label
-            ><input type="checkbox" id="startup" /><span data-t="startup"
-              >Start when I log in</span
-            ></label
-          ><label
-            ><input type="checkbox" id="updates" /><span data-t="updates"
-              >Automatically install signed app updates (app restarts)</span
-            ></label
-          >
-<label><input type="checkbox" id="closeToTray" /><span data-t="closeToTray">Minimize to tray when closing</span></label>
-          <p data-t="running">
-            When enabled, closing hides the window in the tray. Without an available tray, closing quits the app.
-          </p>
-          <button id="update" data-t="update">Check for updates</button
-          ><button id="quit" data-t="quit">Quit app</button>
+        <nav class="settings-tabs" role="tablist" aria-label="Settings">
+          <button id="settings-preferences" role="tab" data-settings-tab="preferences" aria-controls="settings-panel-preferences" aria-selected="true" data-t="preferences">App preferences</button>
+          <button id="settings-version" role="tab" data-settings-tab="version" aria-controls="settings-panel-version" aria-selected="false" tabindex="-1" data-t="versionUpdates">Version and updates</button>
+          <button id="settings-about" role="tab" data-settings-tab="about" aria-controls="settings-panel-about" aria-selected="false" tabindex="-1" data-t="about">About</button>
+        </nav>
+        <section id="settings-panel-preferences" role="tabpanel" aria-labelledby="settings-preferences">
+          <h2 data-t="preferences">App preferences</h2>
+          <label><span data-t="languageLabel">Language</span><select id="lang" aria-label="Language"><option value="auto" data-t="systemLanguage">System language</option><option value="de">Deutsch</option><option value="en">English</option></select></label>
+          <label><input type="checkbox" id="startup" /><span data-t="startup">Start when I log in</span></label>
+          <label><input type="checkbox" id="closeToTray" /><span data-t="closeToTray">Minimize to tray when closing</span></label>
+          <p data-t="running">When enabled, closing hides the window in the tray. Without an available tray, closing quits the app.</p>
+          <button id="quit" data-t="quit">Quit app</button>
+        </section>
+        <section id="settings-panel-version" role="tabpanel" aria-labelledby="settings-version" hidden>
+          <h2 data-t="versionUpdates">Version and updates</h2>
+          <p><span data-t="installedVersion">Installed version:</span> <strong id="installedVersion">—</strong></p>
+          <label><input type="checkbox" id="updates" /><span data-t="updates">Automatically install signed app updates (app restarts)</span></label>
+          <button id="update" data-t="update">Check for updates</button>
+          <button id="installUpdate" data-t="installUpdate" hidden>Install update and restart</button>
+          <p id="updateStatus" role="status" aria-live="polite" data-t="notChecked">Updates have not been checked yet.</p>
+          <div id="availableRelease" hidden>
+            <h3><span data-t="newVersion">New version:</span> <span id="availableVersion"></span></h3>
+            <pre id="releaseNotes" class="release-notes"></pre>
+          </div>
+          <h3 data-t="installedChanges">Changes in this version</h3>
+          <ul class="installed-changes">
+            <li data-t="changeSettings">Settings organized into App preferences, Version and updates, and About.</li>
+            <li data-t="changeNotes">Read available release notes before choosing to install an update.</li>
+            <li data-t="changeBrand">Consistent blue headings and GabbaProc branding with “Count the sparks!”.</li>
+          </ul>
+        </section>
+        <section id="settings-panel-about" role="tabpanel" aria-labelledby="settings-about" hidden>
+          <h2 data-t="about">About</h2>
+          <h3>Gabba<span class="brand-proc">Proc</span> Companion</h3>
+          <p>Count the sparks!</p>
+          <p data-t="aboutText">Upload your selected WoW Classic Era and Hardcore proc measurements and explore the community’s observations.</p>
+          <p data-t="aboutPrivacy">You choose which characters to upload and whether their names are published. Review the upload preview before sharing.</p>
+          <p>© Nils Keller · MIT License</p>
+          <button id="aboutWebsite" data-t="aboutWebsite">GabbaProc website</button>
+          <button id="aboutSource" data-t="aboutSource">Source code and releases</button>
         </section>
       </div>
     </main>

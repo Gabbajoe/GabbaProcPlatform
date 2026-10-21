@@ -7,6 +7,21 @@ const de = {
   tabaccount: "Account",
   tabsettings: "Einstellungen",
   settings: "Einstellungen",
+  preferences: "App-Einstellungen",
+  versionUpdates: "Version und Updates",
+  about: "Über die App",
+  installedVersion: "Installierte Version:",
+  installUpdate: "Update installieren und neu starten",
+  notChecked: "Noch nicht nach Updates gesucht.",
+  newVersion: "Neue Version:",
+  installedChanges: "Änderungen in dieser Version",
+  changeSettings: "Einstellungen mit Unterreitern für App-Einstellungen, Version und Updates sowie Über die App.",
+  changeNotes: "Versionshinweise verfügbarer Updates vor der Installation lesen.",
+  changeBrand: "Einheitlich blaue Überschriften und GabbaProc-Schriftzug mit „Count the sparks!“.",
+  aboutText: "Lade deine ausgewählten Proc-Messungen aus WoW Classic Era und Hardcore hoch und entdecke die Beobachtungen der Community.",
+  aboutPrivacy: "Du entscheidest, welche Charaktere hochgeladen werden und ob ihre Namen sichtbar sind. Prüfe vor dem Teilen die Upload-Vorschau.",
+  aboutWebsite: "GabbaProc-Webseite",
+  aboutSource: "Quellcode und Releases",
   tag: "Kleine App. Gemeinsame Erkenntnisse.",
   connect: "Account",
   pairHelp:
@@ -64,7 +79,8 @@ function language() {
   document.documentElement.lang = lang;
   $("lang").value = languageChoice;
   for (const [el, en] of original)
-    el.textContent = lang === "de" ? de[el.dataset.t] || en : en;
+    if(el.hasAttribute("data-t")) el.textContent = lang === "de" ? de[el.dataset.t] || en : en;
+  if($("updateStatus").dataset.en) $("updateStatus").textContent=text($("updateStatus").dataset.en,$("updateStatus").dataset.de);
   localStorage.setItem("languageChoice", languageChoice);
   run(() => invoke("set_language", { language: lang }));
 }
@@ -311,7 +327,7 @@ function renderCredential(s) {
 async function overview() {
   const s = await invoke("overview");
   renderProgress(s);
-  if (s.version) $("appVersion").textContent = s.version;
+  if (s.version) { $("appVersion").textContent = s.version; $("installedVersion").textContent = s.version; }
   if (s.localBuild) {
     $("localBuild").hidden = false;
     $("update").disabled = true;
@@ -571,38 +587,52 @@ $("delete").onclick = () =>
     await scan();
     status(text("Deleted. Token revoked.", "Gelöscht. Token gesperrt."));
   });
-let updating = false;
+let updating = false, pendingUpdate = null;
+function updateMessage(en, de) {
+  const el=$("updateStatus");
+  el.removeAttribute("data-t");
+  el.dataset.en=en; el.dataset.de=de; el.textContent=text(en,de);
+}
+async function installAvailableUpdate(manual) {
+  const u=pendingUpdate;
+  if (!u) return;
+  const current=await overview();
+  if(current.busy || current.localBuild) {
+    updateMessage("Finish the current upload before updating.","Bitte den laufenden Upload vor dem Update abschließen.");return;
+  }
+  if(manual && !confirm(text(`Install signed update ${u.version} and restart?`,`Signiertes Update ${u.version} installieren und neu starten?`)))return;
+  $("installUpdate").disabled=true;
+  updateMessage("Installing signed update…","Signiertes Update wird installiert…");
+  try {
+    await u.downloadAndInstall();
+    await invoke("restart_after_update",{version:u.version});
+  } catch(error) {
+    updateMessage("Update failed. Please try again.","Update fehlgeschlagen. Bitte erneut versuchen.");throw error;
+  } finally { $("installUpdate").disabled=false; }
+}
 async function update(manual) {
   if (updating) return;
-  updating = true;
+  updating=true; $("update").disabled=true;
   try {
-    const s = await overview();
-    if (s.busy || s.localBuild) return;
-    const u = await window.__TAURI__.updater.check();
-    if (!u) {
-      if (manual) status(text("App is up to date.", "App ist aktuell."));
-      return;
-    }
-    if (!manual && !$("updates").checked) return;
-    if (
-      manual &&
-      !confirm(
-        text(
-          `Install signed update ${u.version} and restart?`,
-          `Signiertes Update ${u.version} installieren und neu starten?`,
-        ),
-      )
-    )
-      return;
-    status(
-      text("Installing signed update…", "Signiertes Update wird installiert…"),
-    );
-    await u.downloadAndInstall();
-    await invoke("restart_after_update", { version: u.version });
-  } finally {
-    updating = false;
-  }
+    const s=await overview();
+    if(s.localBuild) {updateMessage("Updates are disabled in local test builds.","Updates sind in lokalen Test-Builds deaktiviert.");return;}
+    if(s.busy) {updateMessage("An upload is running. Please check again afterwards.","Ein Upload läuft. Bitte anschließend erneut prüfen.");return;}
+    updateMessage("Checking for updates…","Suche nach Updates …");
+    const u=await window.__TAURI__.updater.check();
+    if(pendingUpdate?.close) await pendingUpdate.close();
+    pendingUpdate=u;
+    $("availableRelease").hidden=!u; $("installUpdate").hidden=!u;
+    if(!u) {updateMessage("You are using the latest version.","Du verwendest die aktuelle Version.");return;}
+    $("availableVersion").textContent=u.version;
+    // Release notes are untrusted remote text. Never insert them as HTML.
+    $("releaseNotes").textContent=u.body?.trim() || text("No release notes were provided.","Für dieses Update wurden keine Versionshinweise bereitgestellt.");
+    updateMessage(`Version ${u.version} is available. Read the changes below.`,`Version ${u.version} ist verfügbar. Änderungen stehen unten.`);
+    if(!manual && $("updates").checked) await installAvailableUpdate(false);
+  } catch(error) {
+    updateMessage("Could not check for updates. Please try again.","Updates konnten nicht geprüft werden. Bitte erneut versuchen.");throw error;
+  } finally {updating=false; $("update").disabled=false;}
 }
+$("installUpdate").onclick=()=>run(async()=>{if(updating)return;updating=true;$("update").disabled=true;try{await installAvailableUpdate(true);}finally{updating=false;$("update").disabled=false;}});
 $("updates").checked = localStorage.getItem("autoUpdates") === "true";
 $("updates").onchange = () => {
   localStorage.setItem("autoUpdates", String($("updates").checked));
@@ -722,6 +752,22 @@ $("disconnectAccount").onclick = () =>
   });
 
 $("closeToTray").onchange = () => run(() => invoke("set_close_to_tray", { enabled: $("closeToTray").checked }));
-for (const [id, destination] of [["sourceLink", "source"], ["websiteLink", "website"]]) {
+for (const [id, destination] of [["sourceLink", "source"], ["websiteLink", "website"], ["aboutWebsite", "website"], ["aboutSource", "source"]]) {
   $(id).onclick = (event) => { event.preventDefault(); run(() => invoke("open_public_link", { destination })); };
+}
+
+const settingsTabs=[...document.querySelectorAll('[data-settings-tab]')];
+function showSettingsTab(selected) {
+  for(const button of settingsTabs) {
+    const active=button===selected;
+    button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;
+    $(button.getAttribute('aria-controls')).hidden=!active;
+  }
+}
+for(const [index,button] of settingsTabs.entries()) {
+  button.onclick=()=>showSettingsTab(button);
+  button.onkeydown=event=>{
+    const next=event.key==='ArrowRight'?(index+1)%settingsTabs.length:event.key==='ArrowLeft'?(index+settingsTabs.length-1)%settingsTabs.length:event.key==='Home'?0:event.key==='End'?settingsTabs.length-1:-1;
+    if(next<0)return;event.preventDefault();showSettingsTab(settingsTabs[next]);settingsTabs[next].focus();
+  };
 }

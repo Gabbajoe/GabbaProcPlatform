@@ -791,8 +791,6 @@ code {
 #export-preview { max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 #export-progress { width: 100%; accent-color: #6ab3ff; }
 #export-file { max-width: 100%; }
-#export-named { width: auto; margin: 0; }
-label:has(> #export-named) { display: inline-flex; align-items: center; gap: 8px; }
 
 .upload-account { color: #7edbd0; }
 .export-paths { margin: 12px 0 20px; color: var(--muted); font-size: 12px; }
@@ -802,3 +800,7 @@ label:has(> #export-named) { display: inline-flex; align-items: center; gap: 8px
 .export-paths dd { margin: 0; overflow-wrap: anywhere; }
 .export-paths code { white-space: normal; font-size: inherit; }
 @media (max-width: 600px) { .export-paths dl { grid-template-columns: 1fr; gap: 3px; } .export-paths dd { margin-bottom: 8px; } }
+
+.export-privacy-choice { display: flex; flex-direction: row; align-items: center; gap: 10px; font-size: 15px; line-height: 1.5; color: var(--text); cursor: pointer; }
+.export-privacy-choice #export-named { display: inline-block; flex: 0 0 18px; width: 18px; height: 18px; padding: 0; margin: 0; accent-color: #6ab3ff; }
+.export-privacy-choice span { font: inherit; color: inherit; }
