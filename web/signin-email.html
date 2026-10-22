@@ -9,11 +9,11 @@
     />
     <title>GabbaProc · Email sign-in</title>
     <link rel="icon" href="/assets/logo.png" />
-    <link rel="stylesheet" href="/assets/site.css?v=91937a3dadf5" />
+    <link rel="stylesheet" href="/assets/site.css?v=d5b25a8b4d60" />
     <script src="/assets/site.js?v=1a2e4f06ab86" defer></script>
     <script src="/assets/signin-email.js?v=d347d2e67ced" defer></script>
   </head>
-  <body>
+  <body class="auth-page">
     <a class="skip" href="#main">Skip to content</a>
     <header class="masthead">
       <a class="brand" href="/"
@@ -69,8 +69,9 @@
         </nav>
       </aside>
       <main id="main">
-        <h1 data-en="Sign in with email" data-de="Mit E-Mail anmelden">Sign in with email</h1>
-        <section class="panel account-panel">
+        <section class="panel account-panel auth-email-card">
+          <img class="signin-logo" src="/assets/logo.png" alt="" width="64" height="64" />
+          <h1 data-en="Sign in with email" data-de="Mit E-Mail anmelden">Sign in with email</h1>
           <p data-en="We will email you a sign-in link and a one-time code. No password needed." data-de="Wir schicken dir einen Anmeldelink und einen Einmalcode per E-Mail. Du brauchst kein Passwort.">We will email you a sign-in link and a one-time code. No password needed.</p>
           <form id="email-login">
             <label
@@ -115,6 +116,7 @@
           </form>
           <p id="email-status" role="status" aria-live="polite"></p>
           <a href="/account.html" data-en="Back to sign-in options" data-de="Zurück zu den Anmeldeoptionen">Back to sign-in options</a>
+          <div class="auth-meta"><a href="/" data-en="Back to GabbaProc" data-de="Zurück zu GabbaProc">Back to GabbaProc</a><div><a href="/privacy.html" data-en="Privacy" data-de="Datenschutz">Privacy</a><span aria-hidden="true"> · </span><a href="/imprint.html" data-en="Legal notice" data-de="Impressum">Legal notice</a></div></div>
         </section>
       </main>
     </div>

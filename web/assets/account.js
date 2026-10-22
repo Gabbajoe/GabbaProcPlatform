@@ -82,6 +82,7 @@
   function render() {
     el("signed-account").hidden = !account;
     el("main").classList.toggle("signin-layout", !account);
+    document.body.classList.toggle("auth-page", !account);
     el("account-description").hidden = !account;
     const login = el("account-login");
     if (account) {
