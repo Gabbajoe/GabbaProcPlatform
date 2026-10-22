@@ -320,12 +320,39 @@ accountLink.id = "header-account";
 accountLink.href = "/account.html";
 $("language").before(accountLink);
 function renderHeaderAccount() {
-  accountLink.textContent =
-    headerAccount?.username ||
-    (headerAccount ? t("My account", "Mein Konto") : t("Sign in", "Anmelden"));
+  accountLink.replaceChildren();
   accountLink.classList.toggle("signed-in", !!headerAccount);
-
+  accountLink.setAttribute("aria-label", headerAccount ? t("My account", "Mein Konto") : t("Sign in", "Anmelden"));
+  if (!headerAccount) {
+    accountLink.textContent = t("Sign in", "Anmelden");
+    return;
+  }
+  const identity = headerAccount.identities?.[0];
+  const name = headerAccount.username || (identity?.display || "").split("@")[0] || t("My account", "Mein Konto");
+  const words = name.split(/[\s_.-]+/u).filter(Boolean);
+  const initials = (words.length > 1 ? Array.from(words[0])[0] + Array.from(words[words.length - 1])[0] : Array.from(name).slice(0, 2).join("")).toLocaleUpperCase();
+  const avatar = document.createElement("span");
+  avatar.className = "account-avatar";
+  avatar.setAttribute("aria-hidden", "true");
+  avatar.textContent = initials;
+  if (typeof headerAccount.avatarUrl === "string" && /^\/api\/account\/avatar(?:\?v=[a-f0-9]+)?$/.test(headerAccount.avatarUrl)) {
+    const image = document.createElement("img");
+    image.src = headerAccount.avatarUrl;
+    image.alt = "";
+    image.width = 32; image.height = 32;
+    image.referrerPolicy = "no-referrer";
+    image.onerror = () => image.remove();
+    avatar.append(image);
+  }
+  const label = document.createElement("span");
+  label.className = "account-label";
+  label.textContent = name;
+  const menu = document.createElement("span");
+  menu.className = "account-menu-icon";
+  menu.setAttribute("aria-hidden", "true");
+  accountLink.append(avatar, label, menu);
 }
+
 window.addEventListener("gabbaproc-account", (event) => {
   headerAccount = event.detail;
   window.gabbaprocAccount = headerAccount;

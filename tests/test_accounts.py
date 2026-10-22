@@ -133,7 +133,7 @@ def test_email_expiry_attempts_and_delivery_failure(clients, monkeypatch):
 def test_oauth_binding_pkce_and_linking(clients, monkeypatch):
     a, b, sent = clients
     monkeypatch.setattr(
-        accounts, "provider_identity", lambda *args: ("1234", "example")
+        accounts, "provider_identity", lambda *args: ("1234", "example", None)
     )
     r = a.post("/api/auth/github/start", json={})
     q = parse_qs(urlparse(r.json()["url"]).query)
@@ -378,6 +378,7 @@ def test_provider_exchange_uses_fixed_endpoint_and_identity(clients, monkeypatch
 
     a, b, sent = clients
     seen = []
+    monkeypatch.setattr(accounts, "load_avatar", lambda *args: None)
 
     def handler(req):
         seen.append(req)
@@ -401,6 +402,7 @@ def test_provider_exchange_uses_fixed_endpoint_and_identity(clients, monkeypatch
     assert accounts.provider_identity("github", "test-code", "verifier") == (
         "123",
         "demo",
+        None,
     )
     assert len(seen) == 2
 
@@ -657,7 +659,7 @@ def test_battlenet_identity_exchange(clients, monkeypatch):
     original = httpx.Client
     monkeypatch.setattr(accounts.httpx, "Client",
         lambda **kw: original(transport=httpx.MockTransport(handler), **kw))
-    assert accounts.provider_identity("battlenet", "code", "verifier") == ("12345", "Tester#1234")
+    assert accounts.provider_identity("battlenet", "code", "verifier") == ("12345", "Tester#1234", None)
 
 
 def test_battlenet_login_link_and_browser_binding(clients, monkeypatch):
@@ -668,7 +670,7 @@ def test_battlenet_login_link_and_browser_binding(clients, monkeypatch):
     assert "battlenet" in a.get("/api/auth/options").json()["providers"]
     signin(a, sent)
     account = a.get("/api/account").json()["id"]
-    monkeypatch.setattr(accounts, "provider_identity", lambda *args: ("12345", "Tester#1234"))
+    monkeypatch.setattr(accounts, "provider_identity", lambda *args: ("12345", "Tester#1234", None))
     start = a.post("/api/auth/battlenet/start", json={"link": True})
     url = urlparse(start.json()["url"])
     assert url.scheme == "https" and url.netloc == "oauth.battle.net"
@@ -681,3 +683,29 @@ def test_battlenet_login_link_and_browser_binding(clients, monkeypatch):
     assert info["id"] == account
     assert any(i["provider"] == "battlenet" for i in info["identities"])
     assert a.get(callback, follow_redirects=False).headers["location"].endswith("auth=failed")
+
+
+def test_private_avatar_and_email_fallback(clients, monkeypatch):
+    import base64
+    a, b, sent = clients
+    image = b"\x89PNG\r\n\x1a\ntest-image"
+    monkeypatch.setattr(accounts, "provider_identity", lambda *args: ("987", "AvatarUser", ("image/png", base64.b64encode(image).decode())))
+    start = a.post("/api/auth/github/start", json={}).json()
+    state = parse_qs(urlparse(start["url"]).query)["state"][0]
+    a.get("/api/auth/github/callback", params={"state": state, "code": "good"})
+    info = a.get("/api/account").json()
+    assert info["avatarUrl"].startswith("/api/account/avatar?v=")
+    result = a.get(info["avatarUrl"])
+    assert result.content == image
+    assert "no-store" in result.headers["cache-control"]
+    assert b.get(info["avatarUrl"]).status_code == 401
+    signin(b, sent)
+    assert b.get(info["avatarUrl"]).status_code == 404
+    assert b.get("/api/account").json()["avatarUrl"] is None
+    signin(a, sent, "linked@example.org", link=True)
+    assert a.get("/api/account/avatar").status_code == 200
+    a.post("/api/auth/logout")
+    signin(a, sent, "linked@example.org")
+    assert a.get("/api/account").json()["avatarUrl"] is None
+    with connect() as db:
+        assert db.execute("SELECT count(*) FROM account_avatars").fetchone()[0] == 0

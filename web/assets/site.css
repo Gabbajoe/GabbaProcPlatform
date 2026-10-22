@@ -672,15 +672,7 @@ code {
 #header-account + #language {
   margin-left: 0;
 }
-#header-account.signed-in::before {
-  content: "";
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-right: 8px;
-  border-radius: 50%;
-  background: #82e0d3;
-}
+
 .account-overview {
   display: flex;
   align-items: center;
@@ -896,3 +888,12 @@ code {
   .auth-page #main { padding: 76px 16px 32px; }
   .auth-page #account-login, .auth-page .auth-email-card { padding: 30px 22px; }
 }
+
+#header-account.signed-in { display: inline-flex; align-items: center; gap: 10px; max-width: 280px; padding: 5px 9px 5px 5px; border: 1px solid transparent; border-radius: 7px; }
+#header-account.signed-in:hover { background: #20344b; border-color: #3c5571; text-decoration: none; }
+.account-avatar { position: relative; display: grid; place-items: center; flex: 0 0 32px; width: 32px; height: 32px; overflow: hidden; border-radius: 50%; background: #305c84; color: #f1f7ff; font-weight: 650; font-size: 12px; }
+.account-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.account-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.account-menu-icon { flex: 0 0 16px; width: 16px; height: 12px; border-block: 2px solid currentColor; position: relative; margin-left: 3px; opacity: .8; }
+.account-menu-icon::before { content: ""; position: absolute; top: 3px; left: 0; width: 16px; border-top: 2px solid currentColor; }
+@media (max-width: 600px) { #header-account.signed-in { max-width: 180px; gap: 7px; } }

@@ -13,7 +13,8 @@ from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
+from .avatars import load_avatar
 from starlette.concurrency import run_in_threadpool
 from .signin_email import message as signin_message
 from .config import value
@@ -180,7 +181,7 @@ def consume(request, state, provider, code=None):
     return result
 
 
-def login(request, provider, subject, display, target=None, redirect=False):
+def login(request, provider, subject, display, target=None, redirect=False, avatar=None):
     token = secrets.token_urlsafe(32)
     with connect() as db:
         db.execute("BEGIN IMMEDIATE")
@@ -213,6 +214,10 @@ def login(request, provider, subject, display, target=None, redirect=False):
                 "INSERT INTO account_identities VALUES(?,?,?,?)",
                 (provider, subject, account, display[:160]),
             )
+        if avatar:
+            db.execute("INSERT INTO account_avatars(account,mime,image) VALUES(?,?,?) ON CONFLICT(account) DO UPDATE SET mime=excluded.mime,image=excluded.image", (account, *avatar))
+        elif not target:
+            db.execute("DELETE FROM account_avatars WHERE account=?", (account,))
         old = request.cookies.get(COOKIE, "")
         if old:
             db.execute("DELETE FROM account_sessions WHERE hash=?", (digest(old),))
@@ -315,7 +320,7 @@ def provider_identity(provider, code, verifier):
             subject = str(user["sub"] if provider == "battlenet" else user["id"])
             if not subject.isdecimal():
                 raise ValueError()
-            return subject, str(user.get("battletag") or user.get("username") or user.get("login") or subject)
+            return subject, str(user.get("battletag") or user.get("username") or user.get("login") or subject), load_avatar(provider, subject, user)
     except (httpx.HTTPError, ValueError, KeyError, TypeError):
         raise HTTPException(502, "Provider sign-in failed; please retry") from None
 
@@ -338,9 +343,9 @@ def oauth_callback(provider: str, request: Request):
         code = request.query_params.get("code", "")
         if not code or len(code) > 1024:
             raise HTTPException(400, "Missing authorization code")
-        subject, display = provider_identity(provider, code, payload["verifier"])
+        subject, display, avatar = provider_identity(provider, code, payload["verifier"])
         return login(
-            request, provider, subject, display, payload.get("link"), redirect=True
+            request, provider, subject, display, payload.get("link"), redirect=True, avatar=avatar
         )
     except HTTPException:
         return RedirectResponse("/account.html?auth=failed", status_code=303)
@@ -466,6 +471,7 @@ def account_info(request: Request):
         profile = db.execute(
             "SELECT username FROM account_profiles WHERE account=?", (aid,)
         ).fetchone()
+        avatar = db.execute("SELECT image FROM account_avatars WHERE account=?", (aid,)).fetchone()
         browser_session = db.execute(
             "SELECT expires FROM account_sessions WHERE hash=?",
             (digest(request.cookies.get(COOKIE, "")),),
@@ -474,9 +480,22 @@ def account_info(request: Request):
         "sessionExpiresAt": browser_session["expires"] if browser_session else None,
         "id": aid,
         "username": profile["username"] if profile else None,
+        "avatarUrl": "/api/account/avatar?v=" + digest(avatar["image"])[:16] if avatar else None,
         "identities": identities,
         "devices": devices,
     }
+
+
+@router.get("/account/avatar")
+def account_avatar(request: Request):
+    aid = session(request)
+    with connect() as db:
+        avatar = db.execute("SELECT mime,image FROM account_avatars WHERE account=?", (aid,)).fetchone()
+    if not avatar:
+        raise HTTPException(404, "No avatar")
+    return Response(base64.b64decode(avatar["image"]), media_type=avatar["mime"],
+                    headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+
 
 
 @router.put("/account/profile")
