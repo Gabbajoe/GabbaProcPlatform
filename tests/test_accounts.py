@@ -444,6 +444,9 @@ def test_email_html_link_and_plaintext(monkeypatch):
     plain = message.get_body(preferencelist=("plain",)).get_content()
     html = message.get_body(preferencelist=("html",)).get_content()
     assert "01234567" in plain and "01234567" in html
+    assert "The button" not in html and "Der Button" not in html
+    assert "email sign-in page" in html and "E-Mail-Anmeldeseite" in html
+    assert "account page" not in plain and "Kontoseite" not in plain
     assert "text/plain" in message.as_string() and "text/html" in message.as_string()
     link = unescape(re.search(r'href="([^"]+#emailChallenge[^"]+)"', html)[1])
     parsed = urlparse(link)
