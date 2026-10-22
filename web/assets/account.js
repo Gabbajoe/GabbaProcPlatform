@@ -8,6 +8,7 @@
   const status = (en, de) => {
     el("account-status").textContent = tr(en, de);
   };
+  document.title = "GabbaProc · " + (signup ? tr("Create account", "Konto erstellen") : tr("Sign in", "Anmelden"));
   const pairingKey = "gabbaproc.pendingPairing";
   let pairingShown = false;
   function pendingPairing() {
@@ -80,6 +81,7 @@
     }
   }
   function render() {
+    document.title = "GabbaProc · " + (account ? tr("My account", "Mein Konto") : signup ? tr("Create account", "Konto erstellen") : tr("Sign in", "Anmelden"));
     el("signed-account").hidden = !account;
     el("main").classList.toggle("signin-layout", !account);
     document.body.classList.toggle("auth-page", !account);

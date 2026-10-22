@@ -2,6 +2,12 @@
 (() => {
   const el = id => document.getElementById(id);
   const tr = (en, de) => document.documentElement.lang === "de" ? de : en;
+  function updateTitle() {
+    const signup = new URLSearchParams(location.search).get("mode") === "signup";
+    document.title = "GabbaProc · " + (signup ? tr("Create account with email", "Konto mit E-Mail erstellen") : tr("Email sign-in", "Mit E-Mail anmelden"));
+  }
+  updateTitle();
+  new MutationObserver(updateTitle).observe(document.documentElement, {attributes: true, attributeFilter: ["lang"]});
   let challenge = null;
   if (new URLSearchParams(location.search).get("mode") === "signup") {
     const heading = document.querySelector("h1");
