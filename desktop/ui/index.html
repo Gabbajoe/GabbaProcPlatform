@@ -148,27 +148,12 @@
             </button>
             <p id="pairStatus" role="status" aria-live="polite"></p>
           </details>
-          <details id="manualAccess">
-            <summary data-t="manualAccess">
-              Use an upload token manually
-            </summary>
-            <p data-t="tokenHelp">
-              Alternatively, paste an existing upload token or create one on the
-              website. It is stored in your system keyring, or only for this
-              session when unavailable.
-            </p>
-            <label
-              ><span data-t="token">Upload token</span
-              ><input id="token" type="password" autocomplete="off" /></label
-            ><button id="saveToken" data-t="save">Save token</button
-            ><span id="credential"></span>
-          </details>
         </section>
         <details>
           <summary data-t="deleteTitle">Delete my contributed data</summary>
           <p data-t="deleteHelp">
-            Deletes all data owned by this upload token and revokes it. You will
-            need a new upload access token to contribute again.
+            Deletes the data uploaded by this app and disconnects it. Connect your
+            account again to contribute new data.
           </p>
           <button id="delete" class="danger" data-t="delete">
             Delete data permanently
@@ -229,7 +214,7 @@
       <pre id="status" role="status" aria-live="polite"></pre>
     </div>
     <footer>
-      <span id="appVersion">0.1.2</span> · MIT · gabbaproc.kellerkind.info<br /><a id="sourceLink" href="https://github.com/Gabbajoe/GabbaProcPlatform"
+      <span id="appVersion"></span> · MIT · gabbaproc.kellerkind.info<br /><a id="sourceLink" href="https://github.com/Gabbajoe/GabbaProcPlatform"
         data-t="source"
         >Source & releases: github.com/Gabbajoe/GabbaProcPlatform</a
       >

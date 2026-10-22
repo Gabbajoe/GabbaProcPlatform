@@ -27,9 +27,9 @@ cold-start or cross-platform guarantee. Browser checks also cover a deliberately
 delayed scan and credential load while other controls remain usable.
 
 Start an isolated PostgreSQL test API and worker using the development server
-code before trying uploads. Use a test token and a copy of SavedVariables, not
-production credentials. The live website now supports this queue protocol, but local builds and test
-tokens remain separate from production.
+code before trying uploads. Connect a test account through the browser and use
+a copy of SavedVariables, not production credentials. Local builds and test
+accounts remain separate from production.
 
 ## Archive transport
 
@@ -78,9 +78,9 @@ Windows/macOS filesystem and queue tests, production migration/backup recovery,
 account login/device linking and representative concurrent large-archive load.
 
 The prepared workstation test environment uses a separate
-`gabbaproc_companion_test` database and local API port 8771. A private test token
-is in `desktop/target/local-build/LOCAL-TEST-TOKEN.txt`; paste it into this test
-app only. The API and worker run locally and need restarting after a reboot.
+`gabbaproc_companion_test` database and local API port 8771. Enable account sign-in
+on that API and connect through the app's normal account flow. Manual token entry
+has been removed. The API and worker run locally and need restarting after a reboot.
 
 Development build dev.3 adds per-character upload progress. Percentages count
 server-confirmed packets, not bytes sent. Preparing, sending, checking, waiting,

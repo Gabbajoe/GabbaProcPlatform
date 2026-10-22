@@ -379,35 +379,6 @@ fn preview(id: String, state: State<AppState>) -> Result<Value> {
     gabbaproc_core::payload_batches(&gabbaproc_core::read_file(path)?, named)
         .map(|packets| json!({"packets": packets}))
 }
-#[tauri::command]
-fn set_token(token: String, state: State<AppState>) -> Result<bool> {
-    if token.len() < 30
-        || token.len() > 100
-        || !token
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"_-".contains(&b))
-    {
-        return Err("Invalid token format".into());
-    }
-    let mut s = state.0.lock().unwrap();
-    if s.busy {
-        return Err("Upload in progress".into());
-    }
-    s.persistent = key()
-        .and_then(|k| k.set_password(&token).map_err(|_| "Keyring locked".into()))
-        .is_ok();
-    s.keyring_loading = false;
-    s.config.account_linked = false;
-    s.config.account_username = None;
-    s.config.account_device = None;
-    s.config.reconnect_digest = None;
-    s.config.token_digest = Some(format!("{:x}", Sha256::digest(token.as_bytes())));
-    s.token = Some(token);
-    s.config.acks.clear();
-    save(&s)?;
-    Ok(s.persistent)
-}
-
 fn clear_account_access(s: &mut Inner) {
     if let Ok(entry) = key() {
         let _ = entry.delete_credential();
@@ -714,7 +685,7 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
         if fresh {
             s.last_auto_attempt = Some(Instant::now());
         }
-        let token = s.token.clone().ok_or("Set your upload token first")?;
+        let token = s.token.clone().ok_or("Connect your account first")?;
         let jobs: Vec<_> = s
             .config
             .choices
@@ -1259,7 +1230,6 @@ pub fn run() {
             restart_after_update,
             set_choice,
             preview,
-            set_token,
             refresh_account,
             disconnect_account,
             start_pairing,

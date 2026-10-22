@@ -11,7 +11,7 @@
     <link rel="icon" href="/assets/logo.png" />
     <link rel="stylesheet" href="/assets/site.css?v=0dba66bc61dc" />
     <script src="/assets/site.js?v=ab1b74e4357f" defer></script>
-    <script src="/assets/account.js?v=e680df924788" defer></script>
+    <script src="/assets/account.js?v=76ae61ad8a2f" defer></script>
   </head>
   <body class="auth-page">
     <a class="skip" href="#main">Skip to content</a>
@@ -206,75 +206,6 @@
               </details>
             </section>
           </div>
-          <details class="panel account-advanced">
-            <summary
-              data-de="Manuelle Upload-Tokens"
-              data-en="Manual upload tokens"
-            >
-              Manual upload tokens
-            </summary>
-            <p
-              data-de="Wenn du bereits mit der Companion-App hochgeladen hast, verknüpfe deren bisherigen Token. So bleiben deine Charaktere und Beiträge zugeordnet."
-              data-en="If you have already uploaded with the companion, link its existing token to preserve ownership of your characters and contributions."
-            >
-              If you have already uploaded with the companion, link its existing
-              token to preserve ownership of your characters and contributions.
-            </p>
-            <form id="claim-device">
-              <input
-                id="claim-token"
-                type="password"
-                autocomplete="off"
-                minlength="30"
-                maxlength="100"
-                required
-                aria-label="Upload token"
-              /><button
-                type="submit"
-                data-de="Bestehenden Token verknüpfen"
-                data-en="Link existing token"
-              >
-                Link existing token
-              </button>
-            </form>
-            <details>
-              <summary>
-                <span
-                  data-de="Neuen Upload-Token für Companion 0.1.2 erstellen"
-                  data-en="Create a new upload token for Companion 0.1.2"
-                  >Create a new upload token for Companion 0.1.2</span
-                >
-              </summary>
-              <p
-                data-de="Für einen neuen Zugang. Bereits hochgeladene Charaktere bleiben an ihren bisherigen Gerätezugang gebunden."
-                data-en="For new access. Previously uploaded characters remain owned by their existing device access."
-              >
-                For new access. Previously uploaded characters remain owned by
-                their existing device access.
-              </p>
-              <button
-                id="account-new-device"
-                data-de="Neuen Token erstellen"
-                data-en="Create new token"
-              >
-                Create new token</button
-              ><input
-                id="account-device-token"
-                type="password"
-                readonly
-                hidden
-                autocomplete="off"
-                aria-label="New upload token"
-              /><button
-                id="account-copy-token"
-                hidden
-                data-de="Token kopieren"
-                data-en="Copy token"
-              >
-                Copy token
-              </button>
-            </details>
-          </details>
           <div class="panel account-advanced account-danger">
             <details>
               <summary>

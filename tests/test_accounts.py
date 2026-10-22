@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from server.app import app
 from server import accounts
-from server.storage import connect, invite
+from server.storage import connect
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ def clients(tmp_path, monkeypatch):
         init()
         with connect() as db:
             db.execute(
-                "TRUNCATE devices,invites,accounts,auth_flows,device_links,limits CASCADE"
+                "TRUNCATE devices,accounts,auth_flows,device_links,limits CASCADE"
             )
     sent = []
     monkeypatch.setattr(
@@ -178,18 +178,27 @@ def test_discord_issuer_checked(clients, monkeypatch):
     assert not called
 
 
-def test_device_claim_ownership_and_revoke(clients):
+def connect_device(c):
+    pair = c.post("/api/device-link/start").json()
+    response = c.post("/api/device-link/approve", json={"userCode": pair["userCode"]})
+    assert response.status_code == 200, response.text
+    response = c.post("/api/device-link/poll", json={"deviceCode": pair["deviceCode"]})
+    assert response.status_code == 200, response.text
+    value = response.json()
+    value["id"] = value["deviceId"]
+    return value
+
+
+def test_device_ownership_and_revoke(clients):
     a, b, sent = clients
     signin(a, sent)
     signin(b, sent, "two@example.org")
-    token = a.post("/api/enroll", json={"invite": invite()}).json()["token"]
+    token = connect_device(a)["token"]
     auth = {"Authorization": "Bearer " + token}
-    assert a.post("/api/account/claim-device", headers=auth).status_code == 200
-    assert b.post("/api/account/claim-device", headers=auth).status_code == 409
     did = a.get("/api/account").json()["devices"][0]["id"]
     assert b.delete("/api/account/devices/" + did).status_code == 404
     assert a.delete("/api/account/devices/" + did).status_code == 200
-    assert a.post("/api/account/claim-device", headers=auth).status_code == 401
+    assert a.get("/api/device-account", headers=auth).status_code == 401
 
 
 def test_pairing_approval_and_single_redemption(clients):
@@ -233,7 +242,7 @@ def test_pairing_approval_and_single_redemption(clients):
 def test_pair_existing_preserves_token_and_delete_account(clients):
     a, b, sent = clients
     signin(a, sent)
-    token = b.post("/api/enroll", json={"invite": invite()}).json()["token"]
+    token = connect_device(a)["token"]
     pair = b.post(
         "/api/device-link/start", headers={"Authorization": "Bearer " + token}
     ).json()
@@ -296,7 +305,7 @@ def test_pairing_cannot_take_foreign_device(clients):
     a, b, sent = clients
     signin(a, sent)
     signin(b, sent, "two@example.org")
-    token = a.post("/api/account/devices").json()["token"]
+    token = connect_device(a)["token"]
     pair = b.post(
         "/api/device-link/start", headers={"Authorization": "Bearer " + token}
     ).json()
@@ -330,7 +339,7 @@ def test_delete_removes_imported_data_and_cancels_jobs(clients):
 
     a, b, sent = clients
     signin(a, sent)
-    token = a.post("/api/account/devices").json()["token"]
+    token = connect_device(a)["token"]
     headers = {"Authorization": "Bearer " + token}
     payload = {
         "schemaVersion": 1,
@@ -502,7 +511,7 @@ def test_disconnect_reconnect_keeps_device_and_rotates_token(clients):
     assert (
         a.put("/api/account/profile", json={"username": "TestUser"}).status_code == 200
     )
-    device = a.post("/api/account/devices").json()
+    device = connect_device(a)
     old = {"Authorization": "Bearer " + device["token"]}
     info = a.get("/api/device-account", headers=old).json()
     assert info == {

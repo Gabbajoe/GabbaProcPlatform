@@ -36,7 +36,7 @@ async def main():
     initialize()
     with connect() as db:
         db.execute(
-            "TRUNCATE devices,invites,owners,snapshots,totals,segments,limits,upload_jobs CASCADE"
+            "TRUNCATE devices,owners,snapshots,totals,segments,limits,upload_jobs CASCADE"
         )
     users = []
     for _ in range(200):

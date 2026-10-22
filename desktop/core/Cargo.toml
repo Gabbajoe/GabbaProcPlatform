@@ -1,6 +1,6 @@
 [package]
 name = "gabbaproc-core"
-version = "0.1.4-rc.2"
+version = "0.1.4-rc.3"
 edition = "2021"
 license = "MIT"
 [dependencies]

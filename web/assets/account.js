@@ -195,10 +195,10 @@
         " ";
       row.append(label);
       if (device.revoked) {
-        row.append(document.createTextNode(tr("Revoked", "Widerrufen")));
+        row.append(document.createTextNode(tr("Disconnected", "Getrennt")));
       } else {
         const button = document.createElement("button");
-        button.textContent = tr("Revoke", "Widerrufen");
+        button.textContent = tr("Disconnect", "Trennen");
         button.onclick = () =>
           action(button, async () => {
             await request("/account/devices/" + device.id, "DELETE");
@@ -244,17 +244,6 @@
       await request("/auth/logout", "POST");
       location.assign("/account.html");
     });
-  el("claim-device").onsubmit = (event) => {
-    event.preventDefault();
-    action(event.submitter, async () => {
-      await request("/account/claim-device", "POST", undefined, {
-        Authorization: "Bearer " + el("claim-token").value.trim(),
-      });
-      el("claim-token").value = "";
-      await refresh();
-      status("Existing device linked.", "Bestehender Gerätezugang verknüpft.");
-    });
-  };
   el("pair-approve").onsubmit = (event) => {
     event.preventDefault();
     action(event.submitter, async () => {
@@ -274,23 +263,6 @@
       );
     });
   };
-  el("account-new-device").onclick = (event) =>
-    action(event.target, async () => {
-      const r = await request("/account/devices", "POST");
-      el("account-device-token").value = r.token;
-      el("account-device-token").hidden = false;
-      el("account-copy-token").hidden = false;
-      await refresh();
-      status(
-        "Copy this token into the companion. It is shown only now.",
-        "Diesen Token in die Companion-App kopieren. Er wird nur jetzt ausgegeben.",
-      );
-    });
-  el("account-copy-token").onclick = (event) =>
-    action(event.target, async () => {
-      await navigator.clipboard.writeText(el("account-device-token").value);
-      status("Token copied.", "Token kopiert.");
-    });
   el("account-delete").onclick = (event) => {
     if (
       !confirm(

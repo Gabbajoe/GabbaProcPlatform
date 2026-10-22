@@ -119,40 +119,6 @@ def health():
     return {"ok": True, "schemaVersion": 1}
 
 
-@app.post("/api/enroll")
-async def enroll(request: Request):
-    # Invites are single-use, expire after a day, and are issued by the operator.
-    # Public automated registration is deliberately not enabled without abuse controls.
-    await run_in_threadpool(rate, "enroll:" + digest(request.client.host), 10)
-    data = await body(request)
-    if (
-        set(data) != {"invite"}
-        or not isinstance(data["invite"], str)
-        or len(data["invite"]) > 100
-    ):
-        raise HTTPException(400, "Invalid invite")
-    return await run_in_threadpool(enroll_invite, data)
-
-
-def enroll_invite(data):
-    token = secrets.token_urlsafe(32)
-    did = secrets.token_hex(16)
-    with connect() as db:
-        db.execute("BEGIN IMMEDIATE")
-        updated = db.execute(
-            "UPDATE invites SET used=1 WHERE hash=? AND used=0 AND expires>?",
-            (digest(data["invite"]), int(time.time())),
-        ).rowcount
-        if not updated:
-            raise HTTPException(403, "Invite expired or already used")
-        db.execute(
-            "INSERT INTO devices(id,token_hash,created) VALUES(?,?,?)",
-            (did, digest(token), int(time.time())),
-        )
-        db.commit()
-    return {"token": token}
-
-
 @app.post("/api/imports")
 async def upload(request: Request):
     did = await run_in_threadpool(device, request)

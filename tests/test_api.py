@@ -1,8 +1,17 @@
-import copy, json, time, uuid, os
+import copy, json, time, uuid, os, secrets
 import pytest
 from fastapi.testclient import TestClient
 from server.app import app
-from server.storage import invite, connect
+from server.storage import connect, digest
+
+
+def create_test_device():
+    """Provision credentials for upload tests; pairing is tested separately."""
+    token = secrets.token_urlsafe(32)
+    with connect() as db:
+        db.execute("INSERT INTO devices(id,token_hash,created) VALUES(?,?,?)",
+                   (secrets.token_hex(16), digest(token), int(time.time())))
+    return token
 
 
 @pytest.fixture
@@ -24,10 +33,10 @@ def api(tmp_path, monkeypatch):
         init()
         with connect() as db:
             db.execute(
-                "TRUNCATE devices,invites,owners,snapshots,totals,segments,limits CASCADE"
+                "TRUNCATE devices,owners,snapshots,totals,segments,limits CASCADE"
             )
     with TestClient(app) as c:
-        token = c.post("/api/enroll", json={"invite": invite()}).json()["token"]
+        token = create_test_device()
         c.headers["Authorization"] = "Bearer " + token
         yield c
     if os.environ.get("GABBAPROC_TEST_DATABASE_URL"):
@@ -114,7 +123,7 @@ def test_identity_and_privacy(api, sample):
         == 200
     )
     assert api.get("/api/stats").json()["contributors"] == []
-    other = api.post("/api/enroll", json={"invite": invite()}).json()["token"]
+    other = create_test_device()
     assert (
         api.post(
             "/api/imports", json=sample, headers={"Authorization": "Bearer " + other}
@@ -126,10 +135,9 @@ def test_identity_and_privacy(api, sample):
     assert api.post("/api/imports", json=sample).status_code == 401
 
 
-def test_invites_single_use_and_unknown(api):
-    code = invite()
-    assert api.post("/api/enroll", json={"invite": code}).status_code == 200
-    assert api.post("/api/enroll", json={"invite": code}).status_code == 403
+def test_obsolete_registration_routes_removed(api):
+    for route in ("/api/enroll", "/api/account/claim-device", "/api/account/devices"):
+        assert api.post(route).status_code == 404
 
 
 def test_quarantine_and_counter_regression(api, sample):
@@ -300,7 +308,7 @@ def test_sqlite_migration_preserves_measurements_and_tokens(
                     )
     with connect() as db:
         db.execute(
-            "TRUNCATE devices,invites,owners,snapshots,totals,segments,limits,upload_jobs CASCADE"
+            "TRUNCATE devices,owners,snapshots,totals,segments,limits,upload_jobs CASCADE"
         )
     migrate(source, grant=False)
     with connect() as db:

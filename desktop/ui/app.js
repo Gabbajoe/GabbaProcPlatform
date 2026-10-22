@@ -30,12 +30,7 @@ const de = {
   connected: "Verbunden",
   disconnect: "Trennen",
   connectionSettings: "Verbindung einrichten",
-  manualAccess: "Upload-Token manuell verwenden",
   pairCancel: "Verbindung abbrechen",
-  tokenHelp:
-    "Alternativ einen bestehenden Upload-Token einfügen oder auf der Website erstellen. Er wird im System-Schlüsselbund gespeichert, andernfalls nur für diese Sitzung.",
-  token: "Upload-Token",
-  save: "Token speichern",
   characters: "Charaktere auswählen",
   help: "Im Addon exportieren (/gpt export), danach /reload oder ausloggen. Nur ausgewählte Charaktere werden hochgeladen. Anonyme Uploads nutzen eine dauerhafte pseudonyme ID.",
   scan: "WoW suchen",
@@ -60,7 +55,7 @@ const de = {
   preview: "Upload-Vorschau",
   deleteTitle: "Meine gespendeten Daten löschen",
   deleteHelp:
-    "Löscht alle Daten dieses Upload-Tokens und sperrt ihn. Danach brauchst du eine neue Einladung.",
+    "Löscht die von dieser App hochgeladenen Daten und trennt ihre Verbindung. Verbinde dein Konto erneut, um neue Daten beizutragen.",
   delete: "Daten endgültig löschen",
   source: "Quellcode & Releases: github.com/Gabbajoe/GabbaProcPlatform",
 };
@@ -264,7 +259,6 @@ function renderCredential(s) {
   const linked = !!(s.accountLinked && s.hasToken);
   $("accountConnected").hidden = !linked;
   $("accountSetup").hidden = linked;
-  $("manualAccess").hidden = linked;
   $("accountName").textContent =
     s.accountUsername || text("GabbaProc account", "GabbaProc-Konto");
   $("accountExpiry").textContent = s.accountExpiresAt
@@ -287,7 +281,6 @@ function renderCredential(s) {
   if (lastLinkedState !== linked) {
     lastLinkedState = linked;
     $("accountSetup").open = !linked;
-    $("manualAccess").open = false;
   }
   if (
     s.hasToken &&
@@ -316,13 +309,6 @@ function renderCredential(s) {
       : text("No upload access", "Kein Upload-Zugang");
   $("connection").dataset.ready = String(!!s.hasToken);
 
-  $("credential").textContent = s.keyringLoading
-    ? text("Loading saved token…", "Gespeicherter Token wird geladen …")
-    : s.hasToken
-      ? s.persistentToken
-        ? text("Saved in keyring", "Im Schlüsselbund gespeichert")
-        : text("Session only", "Nur diese Sitzung")
-      : text("No token", "Kein Token");
 }
 async function overview() {
   const s = await invoke("overview");
@@ -332,10 +318,6 @@ async function overview() {
     $("localBuild").hidden = false;
     $("update").disabled = true;
     $("updates").disabled = true;
-    document.querySelector('[data-t="tokenHelp"]').textContent = text(
-      "Use a token from the local test server. Production upload tokens do not work here.",
-      "Verwende einen Token des lokalen Testservers. Upload-Tokens der öffentlichen Webseite funktionieren hier nicht.",
-    );
   }
   $("auto").checked = s.autoUpload;
   $("closeToTray").checked = s.closeToTray !== false;
@@ -545,12 +527,6 @@ $("folder").onclick = () =>
       await scan();
     }
   });
-$("saveToken").onclick = () =>
-  run(async () => {
-    await invoke("set_token", { token: $("token").value.trim() });
-    $("token").value = "";
-    await overview();
-  });
 $("auto").onchange = () =>
   run(() => invoke("set_auto", { enabled: $("auto").checked }));
 $("bandwidth").onchange = () =>
@@ -600,9 +576,9 @@ async function installAvailableUpdate(manual) {
   if(current.busy || current.localBuild) {
     updateMessage("Finish the current upload before updating.","Bitte den laufenden Upload vor dem Update abschließen.");return;
   }
-  if(manual && !confirm(text(`Install signed update ${u.version} and restart?`,`Signiertes Update ${u.version} installieren und neu starten?`)))return;
+  if(manual && !confirm(text(`Install update ${u.version} and restart?`,`Update ${u.version} installieren und neu starten?`)))return;
   $("installUpdate").disabled=true;
-  updateMessage("Installing signed update…","Signiertes Update wird installiert…");
+  updateMessage("Installing update…","Update wird installiert…");
   try {
     await u.downloadAndInstall();
     await invoke("restart_after_update",{version:u.version});

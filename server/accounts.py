@@ -567,38 +567,6 @@ def attach(db, aid, did):
     )
 
 
-@router.post("/account/claim-device")
-def claim(request: Request):
-    same_origin(request)
-    aid = session(request)
-    from .app import device
-
-    did = device(request)
-    with connect() as db:
-        db.execute("BEGIN IMMEDIATE")
-        attach(db, aid, did)
-        db.commit()
-    return {"status": "linked"}
-
-
-@router.post("/account/devices")
-def create_device(request: Request):
-    same_origin(request)
-    aid = session(request)
-    limited(request, "new-device", 10)
-    token, did = secrets.token_urlsafe(32), secrets.token_hex(16)
-    with connect() as db:
-        db.execute("BEGIN IMMEDIATE")
-        lock(db, "account:" + aid)
-        db.execute(
-            "INSERT INTO devices(id,token_hash,created) VALUES(?,?,?)",
-            (did, digest(token), int(time.time())),
-        )
-        attach(db, aid, did)
-        db.commit()
-    return {"token": token, "id": did}
-
-
 @router.delete("/account/devices/{did}")
 def revoke_device(did: str, request: Request):
     same_origin(request)

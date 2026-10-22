@@ -4,7 +4,7 @@ Stand: 21.10.2026. Discord, GitHub und E-Mail sind implementiert und live aktivi
 E-Mail-Anmeldung und Geräteverknüpfung wurden über öffentliches HTTPS geprüft.
 Der vollständige Discord-/GitHub-Login mit echter Anbieter-Freigabe muss noch vom
 Betreiber durchgespielt werden. Google, Microsoft und Apple bleiben deaktiviert.
-Bestehende Einladungs-/Geräte-Tokens funktionieren weiterhin.
+Die Companion-App wird über die Kontoverknüpfung eingerichtet.
 
 ## Reihenfolge und Aufgabenteilung
 
@@ -175,10 +175,6 @@ müssen funktionieren. Kein Zugriff auf private Benutzer-Postfächer erforderlic
 
 ## Companion mit dem Konto verbinden
 
-Die direkte Verknüpfung ist im lokalen AppImage 0.1.3-rc.2 enthalten. Für die
-veröffentlichte 0.1.2 auf der Kontoseite einen Token erzeugen oder den bestehenden
-Token ausdrücklich zuordnen.
-
 1. In der neuen App **Mit Konto verbinden** klicken.
 2. App fordert eine kurzlebige Geräte-Verknüpfung beim GabbaProc-Server an.
 3. Der normale Browser öffnet unsere Kontoseite; dort Anbieter oder E-Mail auswählen.
@@ -186,9 +182,8 @@ Token ausdrücklich zuordnen.
 5. Die App erhält einen eigenen widerrufbaren Upload-Zugang und speichert ihn im System-Schlüsselbund.
 6. Unter **Mein Konto → Geräte** lassen sich Verbindungen später widerrufen.
 
-Anbieter-Tokens bleiben auf dem Server. Bestehende Einladungs-Tokens werden nur
-mit Besitznachweis zugeordnet, damit Messdaten und ausstehende Uploads erhalten
-bleiben. Konten werden nicht automatisch anhand gleicher E-Mail-Adressen zusammengeführt.
+Anbieter-Tokens werden nur serverseitig zur Identitätsabfrage verwendet.
+Konten werden nicht automatisch anhand gleicher E-Mail-Adressen zusammengeführt.
 Mehrere Login-Anbieter lassen sich nur aus einem bereits angemeldeten Konto verbinden.
 
 Technische Grundlage für den Geräteablauf: [RFC 8628](https://www.rfc-editor.org/rfc/rfc8628.html).

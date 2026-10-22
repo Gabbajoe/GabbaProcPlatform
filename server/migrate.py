@@ -10,7 +10,7 @@ from .config import postgres_enabled
 from .storage import connect, init, lock
 from .upload_queue import initialize
 
-TABLES = ("devices", "invites", "owners", "snapshots", "totals", "segments", "limits")
+TABLES = ("devices", "owners", "snapshots", "totals", "segments", "limits")
 
 
 def migrate(source=None, grant=True):
