@@ -139,7 +139,7 @@ Erst nach diesen Tests von einer dauerhaften Archivierung sprechen. Alte Datenl�
 
 Entscheidung vom 20.10.2026: dunkles, blaues WoW-Datenportal mit eigenständigen Bereichen für Messwerte, Vergleiche, Datenqualität, Downloads und persönliches Konto. Keine lange Werbe-Landingpage. Deutsch und Englisch bleiben gleichwertig.
 
-Ein GabbaProc-Konto besitzt Charakterzuordnungen und mehrere widerrufbare Upload-Geräte. Öffentliche Daten lassen sich ohne Anmeldung lesen. Login-Anbieter sind nur Zugangswege zu diesem internen Konto: Google, GitHub, Discord, Microsoft, Apple sowie passwortloser E-Mail-Zugang. Momentan sind weder OAuth-Anwendungen noch Mailversand eingerichtet.
+Ein GabbaProc-Konto besitzt Charakterzuordnungen und mehrere widerrufbare Upload-Geräte. Öffentliche Daten lassen sich ohne Anmeldung lesen. Login-Anbieter sind nur Zugangswege zu diesem internen Konto. Stand 22.10.2026: **Battle.net, GitHub, Discord und passwortloser E-Mail-Zugang sind implementiert und live aktiviert.** Mailversand und Companion-Verknüpfung sind eingerichtet und über öffentliches HTTPS geprüft. Google, Microsoft und Apple bleiben deaktiviert. Die vollständige Anmeldung mit echter Anbieter-Freigabe für Battle.net, GitHub und Discord bleibt als Abnahme offen.
 
 - Anbieter-Identitäten über unveränderliche Provider-/Issuer-/Subject-Kombinationen zuordnen, nicht über Anzeigenamen oder E-Mail-Adressen. Verknüpfung zusätzlicher Anbieter nur aus einem erneut bestätigten bestehenden Konto; keine automatische Kontozusammenführung bei gleicher E-Mail.
 - Bestehende Geräte und Messdaten nur gegen Nachweis des bisherigen Geräte-Tokens an ein Konto anbinden. Eine Charakter-UUID allein beweist keine Berechtigung.
@@ -149,10 +149,10 @@ Ein GabbaProc-Konto besitzt Charakterzuordnungen und mehrere widerrufbare Upload
 - E-Mail-Zugang mit kurzlebigen Einmallinks oder Einmalcodes, Rate-Limits und generischen Antworten. Kein Passwortbestand. Versand erst nach SMTP-Konfiguration und Prüfung von Absender, SPF/DKIM/DMARC aktivieren; keine Anmeldetokens in Logs.
 - Die öffentliche Sichtbarkeit eines Charakters ist unabhängig vom Konto-Login. Login-Mail und Providerprofil werden nicht zu öffentlichen Beitragsnamen.
 - Accountlöschung und Gerätewiderruf umfassen wartende Jobs. Das Trennen eines Login-Anbieters darf nicht versehentlich den letzten Zugangsweg entfernen.
-- Invites werden ein optionales Mittel zur Begrenzung einer Testphase und sind nicht mehr die dauerhafte Benutzerverwaltung. Bestandszugänge bleiben während der Migration nutzbar.
+- Einladungen und manuelle Token-Einrichtung sind entfernt. Die Companion-App wird ausschließlich über die Anmeldung im Browser und die ausdrückliche Gerätefreigabe eingerichtet.
 - Nur konfigurierte und getestete Anbieter als Login-Schaltflächen anbieten. Keine scheinbar funktionierenden Platzhalter. Live-Abnahme jedes Anbieters erfordert dessen Registrierung und Zugangsdaten außerhalb von Git.
 
-Einrichtung: je Anbieter eine Web-Anwendung für `https://gabbaproc.kellerkind.info` registrieren, exakte Callbacks unter `/api/auth/callback/<anbieter>` hinterlegen und minimale Login-Berechtigungen verwenden. Google, GitHub und Discord zuerst; Microsoft mit expliziter Unterstützung persönlicher Konten. Apple nach Services-ID/App-ID/Schlüssel-Konfiguration; E-Mail nach Einrichtung des Versanddienstes. Diese Reihenfolge ist eine Umsetzungsempfehlung, keine bereits erfolgte Aktivierung.
+Einrichtung: je Anbieter eine Web-Anwendung für `https://gabbaproc.kellerkind.info` registrieren, exakte Callbacks unter `/api/auth/<anbieter>/callback` hinterlegen und minimale Login-Berechtigungen verwenden. Battle.net verwendet `https://gabbaproc.kellerkind.info/api/auth/battlenet/callback`. Weitere geplante Anbieter: Google, Microsoft mit expliziter Unterstützung persönlicher Konten und Apple nach Services-ID/App-ID/Schlüssel-Konfiguration. Aktueller Einrichtungsstatus und Anbieter-Portale stehen in [OAUTH-SETUP.md](OAUTH-SETUP.md).
 
 Primärquellen zur Anmeldung: [Google OIDC](https://developers.google.com/identity/openid-connect/openid-connect), [GitHub OAuth](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps), [Discord OAuth](https://discord.com/developers/docs/topics/oauth2), [Microsoft-Kontotypen](https://learn.microsoft.com/en-us/security/zero-trust/develop/identity-supported-account-types), [Apple-Webkonfiguration](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web).
 
@@ -161,3 +161,43 @@ Primärquellen zur Anmeldung: [Google OIDC](https://developers.google.com/identi
 - [Offizielles PostgreSQL-Docker-Image und Datenpfade](https://hub.docker.com/_/postgres)
 - [PostgreSQL: SELECT und SKIP LOCKED](https://www.postgresql.org/docs/current/sql-select.html)
 - [PostgreSQL: konsistente Dumps und Wiederherstellung](https://www.postgresql.org/docs/current/backup-dump.html)
+
+
+## Security and performance review — 2026-10-22
+
+Implementation prepared and locally tested:
+
+1. Existing-identity sign-in within ten minutes is required to link an identity
+   or delete an account. Linking does not renew this deadline. Browser sessions
+   and sign-out-everywhere are available; duplicate account JSON keys are rejected.
+2. Companion TLS verifier updated to rustls-webpki 0.103.16. Weekly/manual/PR
+   dependency audit added. Transitive GTK/updater advisories remain visible in
+   audit output; this does not claim all dependencies are vulnerability-free.
+3. Addon 0.1.5 reuses immutable completed segments, omits duplicate export history,
+   indexes attack counters, reads combat events once, throttles combat UI updates,
+   and defers automatic exports during combat. Archive detail capacity is visible
+   and preserved across reset; cleanup is explicit after verified upload.
+4. Both import paths enforce account-wide budgets: 128 MiB stored detail JSON
+   plus per-row allowance, 50,000 segments, 200 collections, 2,000 imports/hour.
+   Override with GABBAPROC_ACCOUNT_BYTES/SEGMENTS/COLLECTIONS/IMPORTS_HOUR.
+   Processed/rejected/cancelled receipts expire after 90 days; replay is idempotent.
+   Public aggregates are cached 15 seconds with bounded concurrency/rate/cache
+   size. Public names are never cached. Group/class filters precede analysis LIMIT.
+   Global email allowance is configurable via GABBAPROC_EMAILS_HOUR (default 500).
+5. Companion previews run outside the state lock on a blocking worker. UI previews
+   show one actual packet plus total packet count. Parser allocations have a
+   conservative structural budget. Durable packet data is separate from progress;
+   anonymous-mode transitions survive restart without restoring public names.
+6. LIVE: native Froxlor SubDomains HSTS is 31536000 for gabbaproc.kellerkind.info,
+   without includeSubDomains/preload. Apache configtest and public header verified.
+
+Validation: PostgreSQL 53 passing / 1 skipped; SQLite 49 passing / 5 skipped;
+addon Lua and six packaging tests passing; 15 Rust core + 1 Companion tests passing; browser parser and account reauth
+Playwright checks passing. Synthetic Lua export measurements are not WoW FPS.
+Production API/worker/web rollout completed on 2026-10-22 after explicit user
+approval. A fresh PostgreSQL/spool backup succeeded before the additive migration.
+API and worker run gabbaproc:security-20261022; public pages, aggregate endpoints,
+HSTS and served asset hashes were verified. A temporary account confirmed stale
+session rejection for linking/deletion, session listing, logout-all, duplicate JSON
+rejection and storage ledger backfill. Test account/sessions were removed; no email
+was sent. Addon/Companion packages remain local artifacts, not public releases.

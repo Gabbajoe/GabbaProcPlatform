@@ -1,6 +1,6 @@
 {
   "name": "gabbaproc-companion",
-  "version": "0.1.4-rc.3",
+  "version": "0.1.4",
   "private": true,
   "scripts": {
     "dev": "tauri dev",

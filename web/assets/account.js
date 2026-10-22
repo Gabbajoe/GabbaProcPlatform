@@ -2,6 +2,7 @@
 (() => {
   let account = null,
     available = [];
+  const reauth = new URLSearchParams(location.search).get("reauth") === "1";
   const signup = new URLSearchParams(location.search).get("mode") === "signup";
   const el = (id) => document.getElementById(id);
   const tr = (en, de) => (document.documentElement.lang === "de" ? de : en);
@@ -51,6 +52,8 @@
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
     if (!r.ok) {
+      const detail = await r.json().catch(() => ({}));
+      if (detail.detail === "reauth_required") { location.assign("/account.html?reauth=1"); throw new Error("session"); }
       const error = new Error(
         r.status === 429 ? "rate" : r.status === 401 ? "session" : "request",
       );
@@ -133,11 +136,14 @@
     loginTitle.dataset.en = signup ? "Create your account" : "Welcome to GabbaProc";
     loginTitle.dataset.de = signup ? "Erstelle dein Konto" : "Willkommen bei GabbaProc";
     loginTitle.textContent = tr(loginTitle.dataset.en, loginTitle.dataset.de);
-    el("signup-toggle").hidden = !!account;
+    el("signup-toggle").hidden = !!account || reauth;
     const switchLink = el("signup-link");
     switchLink.href = signup ? "/account.html" : "/account.html?mode=signup";
     el("signup-prompt").textContent = signup ? tr("Already have an account?", "Schon ein Konto?") : tr("New here?", "Noch kein Konto?");
     switchLink.textContent = signup ? tr("Sign in", "Anmelden") : tr("Create an account", "Konto erstellen");
+    if (reauth) {
+      loginTitle.textContent = tr("Confirm your identity", "Identität bestätigen");
+    }
     if (!account) return;
     const pending = pendingPairing();
     el("account-name").textContent =
@@ -212,6 +218,20 @@
   async function refresh() {
     try {
       account = await request("/account");
+      if (reauth) {
+        available = available.filter(p => account.identities.some(i => i.provider === p));
+        el("email-signin-link").hidden = !account.identities.some(i => i.provider === "email");
+        account = null;
+        status("Confirm your identity using an existing sign-in method, then retry your account action.", "Bestätige deine Identität mit einer bereits verbundenen Anmeldemethode. Führe die Kontoaktion danach erneut aus.");
+      } else {
+        const result = await request("/account/sessions");
+        el("account-sessions").replaceChildren();
+        for (const item of result.sessions) {
+          const row = document.createElement("p");
+          row.textContent = (item.current ? tr("This browser · ", "Dieser Browser · ") : tr("Other session · ", "Andere Sitzung · ")) + tr("expires ", "gültig bis ") + new Date(item.expiresAt * 1000).toLocaleString(document.documentElement.lang);
+          el("account-sessions").append(row);
+        }
+      }
     } catch (e) {
       if (e.status === 401 || e.status === 503) account = null;
       else throw e;
@@ -244,6 +264,10 @@
       await request("/auth/logout", "POST");
       location.assign("/account.html");
     });
+  el("account-logout-all").onclick = event => action(event.target, async () => {
+    await request("/auth/logout-all", "POST");
+    location.assign("/account.html");
+  });
   el("pair-approve").onsubmit = (event) => {
     event.preventDefault();
     action(event.submitter, async () => {

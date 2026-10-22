@@ -12,6 +12,7 @@ const MAX_BYTES: u64 = 128 * 1024 * 1024;
 #[serde(deny_unknown_fields)]
 pub struct Outbox {
     pub fingerprint: String,
+    #[serde(default, skip_serializing)]
     pub packets: Vec<Value>,
     pub cursor: usize,
     pub job_id: Option<String>,
@@ -48,50 +49,38 @@ impl Outbox {
         if bytes.len() as u64 > MAX_BYTES {
             return Err("Local queue exceeds limit; retained on disk".into());
         }
-        let out: Self =
+        let mut out: Self =
             serde_json::from_slice(&bytes).map_err(|_| "Invalid local queue; retained on disk")?;
+        if out.packets.is_empty() {
+            let packets_path = path.with_extension(if out.named { "named-packets" } else { "packets" });
+            let meta = fs::symlink_metadata(&packets_path).map_err(|_| "Missing upload packets; source retained")?;
+            if !meta.is_file() || meta.len() > MAX_BYTES { return Err("Invalid upload packets".into()); }
+            let mut raw = Vec::new();
+            fs::File::open(packets_path).map_err(|_| "Cannot read packets")?.take(MAX_BYTES + 1).read_to_end(&mut raw).map_err(|_| "Cannot read packets")?;
+            if raw.len() as u64 > MAX_BYTES { return Err("Upload packets exceed limit".into()); }
+            out.packets = serde_json::from_slice(&raw).map_err(|_| "Invalid upload packets")?;
+        }
         if out.cursor > out.packets.len() || out.packets.is_empty() {
             return Err("Invalid local queue position".into());
         }
         Ok(Some(out))
     }
     pub fn save(&self, path: &Path) -> Result<()> {
-        let bytes = serde_json::to_vec(self).map_err(|_| "Cannot encode upload queue")?;
-        if bytes.len() as u64 > MAX_BYTES {
-            return Err("Local queue exceeds 128 MiB; source archive retained".into());
+        let packets_path = path.with_extension(if self.named { "named-packets" } else { "packets" });
+        if !path.exists() || !packets_path.exists() {
+            let packets = serde_json::to_vec(&self.packets).map_err(|_| "Cannot encode packets")?;
+            if packets.len() as u64 > MAX_BYTES { return Err("Local queue exceeds 128 MiB; source retained".into()); }
+            atomic_write(&packets_path, &packets)?;
         }
-        let parent = path.parent().ok_or("Invalid queue directory")?;
-        fs::create_dir_all(parent).map_err(|_| "Cannot create upload queue")?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(parent, fs::Permissions::from_mode(0o700))
-                .map_err(|_| "Cannot protect queue")?;
-        }
-        let temp = path.with_extension("pending");
-        let mut options = fs::OpenOptions::new();
-        options.write(true).create_new(true);
-        // Leftovers belong to an interrupted write; the committed file survives.
-        if temp.exists() {
-            fs::remove_file(&temp).map_err(|_| "Cannot recover queue write")?;
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
-        }
-        let mut file = options
-            .open(&temp)
-            .map_err(|_| "Cannot write upload queue")?;
-        file.write_all(&bytes)
-            .and_then(|_| file.sync_all())
-            .map_err(|_| "Cannot persist upload queue")?;
-        drop(file);
-        fs::rename(&temp, path).map_err(|_| "Cannot commit upload queue")?;
-        #[cfg(unix)]
-        fs::File::open(parent)
-            .and_then(|f| f.sync_all())
-            .map_err(|_| "Cannot persist queue directory")?;
+        let bytes = serde_json::to_vec(self).map_err(|_| "Cannot encode upload state")?;
+        atomic_write(path, &bytes)?;
+        if !self.named { let _ = fs::remove_file(path.with_extension("named-packets")); }
+        Ok(())
+    }
+    pub fn remove(path: &Path) -> Result<()> {
+        fs::remove_file(path).map_err(|_| "Cannot remove completed upload state")?;
+        let _ = fs::remove_file(path.with_extension("packets"));
+        let _ = fs::remove_file(path.with_extension("named-packets"));
         Ok(())
     }
     /// Only a processed receipt advances the cursor. Queued is not an ACK.
@@ -135,21 +124,76 @@ impl Outbox {
             .saturating_add(jitter % 11);
     }
 }
+fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
+        let parent = path.parent().ok_or("Invalid queue directory")?;
+        fs::create_dir_all(parent).map_err(|_| "Cannot create upload queue")?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(parent, fs::Permissions::from_mode(0o700))
+                .map_err(|_| "Cannot protect queue")?;
+        }
+        let temp = path.with_extension("pending");
+        let mut options = fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        // Leftovers belong to an interrupted write; the committed file survives.
+        if temp.exists() {
+            fs::remove_file(&temp).map_err(|_| "Cannot recover queue write")?;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = options
+            .open(&temp)
+            .map_err(|_| "Cannot write upload queue")?;
+        file.write_all(&bytes)
+            .and_then(|_| file.sync_all())
+            .map_err(|_| "Cannot persist upload queue")?;
+        drop(file);
+        fs::rename(&temp, path).map_err(|_| "Cannot commit upload queue")?;
+        #[cfg(unix)]
+        fs::File::open(parent)
+            .and_then(|f| f.sync_all())
+            .map_err(|_| "Cannot persist queue directory")?;
+        Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn privacy_change_survives_restart() {
+        let dir = std::env::temp_dir().join(format!("gabbaproc-privacy-{}", std::process::id()));
+        let path = dir.join("queue.json");
+        let mut queue = Outbox::new("named".into(), vec![json!({"name":"Private", "privacy":"named"})], true);
+        queue.save(&path).unwrap();
+        queue.packets[0] = json!({"privacy":"anonymous"});
+        queue.named = false;
+        queue.fingerprint = "anonymous".into();
+        queue.save(&path).unwrap();
+        let loaded = Outbox::load(&path).unwrap().unwrap();
+        assert!(!loaded.named);
+        assert!(loaded.packets[0].get("name").is_none());
+        assert!(!path.with_extension("named-packets").exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
     #[test]
     fn receipt_and_crash_recovery() {
         let dir = std::env::temp_dir().join(format!("gabbaproc-outbox-{}", std::process::id()));
         let path = dir.join("queue.json");
         let mut queue = Outbox::new("source".into(), vec![json!({"a":1}), json!({"a":2})], false);
         queue.save(&path).unwrap();
+        let packet_metadata = fs::metadata(path.with_extension("packets")).unwrap();
         let id = "a".repeat(64);
         assert!(!queue
             .receipt(&json!({"jobId":id,"status":"queued"}))
             .unwrap());
         queue.save(&path).unwrap();
+        assert_eq!(packet_metadata.modified().unwrap(), fs::metadata(path.with_extension("packets")).unwrap().modified().unwrap());
+        assert!(fs::metadata(&path).unwrap().len() < 1024);
         fs::write(path.with_extension("pending"), "interrupted").unwrap();
         let mut restored = Outbox::load(&path).unwrap().unwrap();
         assert_eq!(restored.cursor, 0);

@@ -68,3 +68,21 @@ of the OAuth/mail secrets. Google credentials are not mounted or activated.
 Disable accounts with `GABBAPROC_ACCOUNTS=false` if needed; existing bearer upload
 credentials continue to work. Never restore an older database over newer uploads
 just to disable login.
+
+
+## Security rollout — 2026-10-22
+
+With explicit approval, created a fresh database/spool backup, stopped only API
+and worker, ran the additive storage-budget migration and restarted both using
+`gabbaproc:security-20261022`. PostgreSQL stayed running. Website assets were
+updated and verified against local SHA-256 hashes.
+
+Rollback source/web/override copies are retained at
+`/opt/gabbaproc/releases/before-security-20261022`. The preceding runtime image is
+`gabbaproc:cleanup-20261022`; additive schema changes do not require restoring an
+old database over new uploads for application rollback.
+
+Public health/statistics/analysis endpoints and HSTS (`max-age=31536000`) passed.
+A removed synthetic account verified sensitive-action reauthentication, all
+configured OAuth providers, session listing, logout-all, duplicate JSON rejection,
+and populated storage accounting. No real login email was sent during validation.

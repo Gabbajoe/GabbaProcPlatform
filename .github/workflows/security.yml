@@ -1,0 +1,22 @@
+name: Dependency security audit
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '31 7 * * 1'
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade pip pip-audit && pip-audit -r requirements.txt
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
+      - run: cargo install cargo-audit --locked
+      # This reports transitive GTK/updater findings too; do not silently ignore
+      # advisories just because the affected call path has not been demonstrated.
+      - run: cargo audit --file desktop/Cargo.lock

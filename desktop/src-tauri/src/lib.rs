@@ -372,13 +372,18 @@ fn set_choice(id: String, enabled: bool, named: bool, state: State<AppState>) ->
     save(&s)
 }
 #[tauri::command]
-fn preview(id: String, state: State<AppState>) -> Result<Value> {
-    let s = state.0.lock().unwrap();
-    let path = s.files.get(&id).ok_or("Unknown character")?;
-    let named = s.config.choices.get(&id).is_some_and(|c| c.named);
-    gabbaproc_core::payload_batches(&gabbaproc_core::read_file(path)?, named)
-        .map(|packets| json!({"packets": packets}))
+async fn preview(id: String, state: State<'_, AppState>) -> Result<Value> {
+    let (path, named) = {
+        let s = state.0.lock().unwrap();
+        (s.files.get(&id).ok_or("Unknown character")?.clone(), s.config.choices.get(&id).is_some_and(|c| c.named))
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        let packets = gabbaproc_core::payload_batches(&gabbaproc_core::read_file(&path)?, named)?;
+        let count = packets.len();
+        Ok(json!({"packetCount": count, "previewPackets": packets.into_iter().take(1).collect::<Vec<_>>()}))
+    }).await.map_err(|_| "Preview task failed".to_string())?
 }
+
 fn clear_account_access(s: &mut Inner) {
     if let Ok(entry) = key() {
         let _ = entry.delete_credential();
@@ -920,8 +925,7 @@ fn sync_inner(state: &AppState, automatic: bool) -> Result<Value> {
                     let mut s = state.0.lock().unwrap();
                     s.config.acks.insert(id.clone(), queue.fingerprint);
                     save(&s)?;
-                    fs::remove_file(&queue_path)
-                        .map_err(|_| "Cannot remove completed local queue")?;
+                    gabbaproc_core::outbox::Outbox::remove(&queue_path)?;
                     s.progress.insert(id.clone(), json!({"phase":"complete","named":queue.named,"confirmed":queue.packets.len(),"received":queue.packets.len(),"total":queue.packets.len(),"nextCheck":0}));
                     return Ok(true);
                 }

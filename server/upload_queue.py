@@ -72,6 +72,8 @@ def receipt(row):
 def enqueue(did, data):
     if not postgres_enabled():
         raise HTTPException(503, "Queued uploads require PostgreSQL")
+    from .budgets import ingest_rate
+    ingest_rate(did)
     if data.exportedAt > time.time() + 86400:
         raise HTTPException(422, "Export is dated in the future")
     raw = json.dumps(
@@ -228,6 +230,8 @@ def process_one():
                     (json.dumps(result), now, row["id"]),
                 )
             db.commit()
+        from .public_cache import clear
+        clear()
         # Deletion only AFTER the import and receipt have committed together.
         with spool_lock(source.parent):
             source.unlink(missing_ok=True)
@@ -275,3 +279,4 @@ def cleanup():
             if time.time() - file.stat().st_mtime > 86400:
                 file.unlink(missing_ok=True)
         sync_directory(path)
+        db.execute("DELETE FROM upload_jobs WHERE status IN ('processed','rejected','cancelled') AND updated<?", (int(time.time()) - 90*86400,))

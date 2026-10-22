@@ -721,3 +721,39 @@ def test_private_avatar_and_email_fallback(clients, monkeypatch):
     assert a.get("/api/account").json()["avatarUrl"] is None
     with connect() as db:
         assert db.execute("SELECT count(*) FROM account_avatars").fetchone()[0] == 0
+
+
+def test_sensitive_actions_require_recent_existing_identity(clients):
+    import time
+    a, b, sent = clients
+    signin(a, sent)
+    with connect() as db:
+        db.execute('UPDATE account_sessions SET expires=?', (int(time.time()) + 3600,))
+    assert a.get('/api/account').status_code == 200
+    assert a.post('/api/auth/email/request', json={'email':'attacker@example.org', 'link':True}).json()['detail'] == 'reauth_required'
+    assert a.post('/api/auth/github/start', json={'link':True}).status_code == 403
+    assert a.delete('/api/account').status_code == 403
+    signin(a, sent)
+    signin(a, sent, 'second@example.org', link=True)
+    assert len(a.get('/api/account').json()['identities']) == 2
+    signin(b, sent)
+    assert len(a.get('/api/account/sessions').json()['sessions']) == 2
+    assert a.post('/api/auth/logout-all').status_code == 200
+    assert b.get('/api/account').status_code == 401
+
+
+def test_linking_does_not_refresh_authentication_age(clients):
+    import time
+    a, b, sent = clients
+    signin(a, sent)
+    expires = int(time.time()) + accounts.SESSION_SECONDS - 300
+    with connect() as db:
+        db.execute('UPDATE account_sessions SET expires=?', (expires,))
+    signin(a, sent, 'second@example.org', link=True)
+    assert a.get('/api/account').json()['sessionExpiresAt'] == expires
+
+
+def test_account_json_rejects_duplicates(clients):
+    a, _, _ = clients
+    response = a.post('/api/auth/email/request', content='{"email":"one@example.org","email":"two@example.org"}', headers={'Content-Type':'application/json'})
+    assert response.status_code == 400

@@ -26,6 +26,8 @@
       body: JSON.stringify(body)
     });
     if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      if (detail.detail === "reauth_required") location.assign("/account.html?reauth=1");
       const error = new Error("Email sign-in failed"); error.status = response.status; throw error;
     }
     return response.json();

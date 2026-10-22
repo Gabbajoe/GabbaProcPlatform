@@ -10,9 +10,15 @@ _analysis_slot = threading.BoundedSemaphore(1)
 
 @router.get("/analysis")
 def analysis(request: Request, spellId: int, group: str = "all", scope: str = "community", classId: int = 0):
+    from .app import rate
+    from .storage import digest
+    rate("public-analysis:" + digest(request.client.host), 60, 60)
     if not _analysis_slot.acquire(blocking=False):
         raise HTTPException(503, "Analysis busy; retry shortly", headers={"Retry-After":"2"})
     try:
+        if scope == "community":
+            from .public_cache import cached
+            return cached(("analysis", spellId, group, classId), lambda: calculate(request, spellId, group, scope, classId))
         return calculate(request, spellId, group, scope, classId)
     finally:
         _analysis_slot.release()
@@ -29,6 +35,13 @@ def calculate(request, spellId, group, scope, classId):
         from .accounts import session
         params.append(session(request))
         where = "EXISTS(SELECT 1 FROM owners o JOIN account_devices a ON a.device=o.device WHERE o.character=g.character AND a.account=?)"
+    from .config import postgres_enabled
+    if group != "all":
+        where += " AND " + ("g.data::jsonb->>'group'=?" if postgres_enabled() else "json_extract(g.data,'$.group')=?")
+        params.append(group)
+    if classId:
+        where += " AND " + ("CAST(g.data::jsonb->'telemetry'->>'classId' AS INTEGER)=?" if postgres_enabled() else "json_extract(g.data,'$.telemetry.classId')=?")
+        params.append(classId)
     with connect() as db:
         records = db.execute("SELECT g.character,g.collection,g.id,g.data FROM segments g JOIN snapshots s USING(character,collection) WHERE " + where + " ORDER BY s.updated DESC,g.id DESC LIMIT 501", params).fetchall()
     limited = len(records)>500

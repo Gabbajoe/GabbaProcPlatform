@@ -1,18 +1,18 @@
 # GabbaProc: OAuth-Anwendungen einrichten
 
-Stand: 21.10.2026. Discord, GitHub und E-Mail sind implementiert und live aktiviert.
+Stand: 22.10.2026. Battle.net, Discord, GitHub und E-Mail sind implementiert und live aktiviert.
 E-Mail-Anmeldung und Geräteverknüpfung wurden über öffentliches HTTPS geprüft.
-Der vollständige Discord-/GitHub-Login mit echter Anbieter-Freigabe muss noch vom
+Der vollständige Battle.net-/Discord-/GitHub-Login mit echter Anbieter-Freigabe muss noch vom
 Betreiber durchgespielt werden. Google, Microsoft und Apple bleiben deaktiviert.
 Die Companion-App wird über die Kontoverknüpfung eingerichtet.
 
 ## Reihenfolge und Aufgabenteilung
 
 1. **Erledigt am 20.10.2026:** Eigene Impressums- und Datenschutzseite sind live (DE/EN); SMTP, lokale Zustellung und Weiterleitung wurden geprüft.
-2. Discord und GitHub registrieren und jeweils vollständig testen.
+2. **Eingerichtet und live:** Battle.net, Discord und GitHub. Vollständige Anmeldung mit echter Anbieter-Freigabe jeweils noch abnehmen.
 3. Google hinzufügen, öffentliche Freigabe/Branding prüfen.
 4. Microsoft hinzufügen. Apple separat nach Klärung der Developer-Mitgliedschaft.
-5. E-Mail-Anmeldung und Companion-Verknüpfung parallel fertigstellen.
+5. **Erledigt:** E-Mail-Anmeldung und Companion-Verknüpfung implementiert und über öffentliches HTTPS geprüft.
 
 Du erstellst die Anwendungen in deinen jeweiligen Anbieter-Konten. Ich baue die
 Server-Anbindung und die Companion-Verknüpfung, hinterlege die Zugangsdaten privat
@@ -214,6 +214,9 @@ Integration und den ersten vollständigen Verbindungstest fortzusetzen.
 
 
 ## Battle.net
+
+**Status: implementiert, Zugangsdaten eingerichtet und live aktiviert (22.10.2026).**
+Die vollständige Anmeldung mit echter Battle.net-Freigabe bleibt als Abnahme offen.
 
 Register a web client at https://community.developer.battle.net/access/clients.
 Redirect URI: `https://gabbaproc.kellerkind.info/api/auth/battlenet/callback`.

@@ -126,6 +126,8 @@ async def upload(request: Request):
         data = Upload.model_validate(await body(request))
     except (ValidationError, ValueError):
         raise HTTPException(422, "Invalid export fields, counters or history")
+    from .budgets import ingest_rate
+    await run_in_threadpool(ingest_rate, did)
     return await run_in_threadpool(import_snapshot, did, data)
 
 
@@ -150,10 +152,22 @@ def import_snapshot(did, data):
         db.execute("BEGIN IMMEDIATE")
         result = apply_snapshot(db, did, data)
         db.commit()
+        from .public_cache import clear
+        clear()
         return result
 
 
 def apply_snapshot(db, did, data):
+    from .budgets import owner_key, check_storage
+    lock(db, "device:" + did)
+    kind, owner = owner_key(db, did)
+    lock(db, "storage-budget:" + kind + ":" + owner)
+    result = _apply_snapshot(db, did, data)
+    check_storage(db, did)
+    return result
+
+
+def _apply_snapshot(db, did, data):
     if data.schemaVersion == 2:
         return apply_archive_batch(db, did, data)
     if data.exportedAt > time.time() + 86400:
@@ -326,10 +340,14 @@ def apply_segments(db, data, backfill=False):
         if previous:
             accumulate(before, -1)
         accumulate(value, 1)
+        encoded = json.dumps(value)
+        delta_bytes = len(encoded) + 256 - (len(previous["data"]) + 256 if previous else 0)
+        db.execute("INSERT INTO storage_usage VALUES(?,?,?,?) ON CONFLICT(character,collection) DO UPDATE SET bytes=storage_usage.bytes+excluded.bytes,segments=storage_usage.segments+excluded.segments",
+                   (*key, delta_bytes, 0 if previous else 1))
         db.execute(
             "INSERT INTO segments VALUES(?,?,?,?,?) ON CONFLICT(character,collection,id) "
             "DO UPDATE SET sequence=excluded.sequence,data=excluded.data",
-            (*key, segment.id, data.sequence, json.dumps(value)),
+            (*key, segment.id, data.sequence, encoded),
         )
     current = {
         (r["spell"], r["area"]): r
@@ -383,7 +401,7 @@ def apply_archive_batch(db, did, data):
     ).fetchone()
     manifest = data.model_copy(update={"schemaVersion": 1, "segments": []})
     if not old or data.sequence > old["sequence"]:
-        result = apply_snapshot(db, did, manifest)
+        result = _apply_snapshot(db, did, manifest)
     else:
         current = {
             (r["spell"], r["area"]): r
@@ -445,6 +463,8 @@ def hide_character(did, character):
         db.commit()
     if not n:
         raise HTTPException(404, "Character not found")
+    from .public_cache import clear
+    clear()
     return {"status": "anonymous"}
 
 
@@ -464,11 +484,24 @@ def remove_device(request: Request):
         db.execute("DELETE FROM owners WHERE device=?", (did,))
         db.execute("UPDATE devices SET revoked=1 WHERE id=?", (did,))
         db.commit()
+    from .public_cache import clear
+    clear()
     return {"status": "deleted"}
 
 
 @app.get("/api/stats")
-def stats():
+def stats(request: Request):
+    from .public_cache import cached
+    rate("public-stats:" + digest(request.client.host), 120, 60)
+    result = dict(cached("stats", calculate_stats))
+    # Names are deliberately never cached: hiding a name takes effect immediately,
+    # including when another API/worker process changed visibility.
+    with connect() as db:
+        result["contributors"] = [dict(r) for r in db.execute("SELECT DISTINCT o.name,o.realm FROM owners o JOIN snapshots s ON s.character=o.character WHERE o.privacy='named' AND s.status='community' ORDER BY o.name LIMIT 100")]
+    return result
+
+
+def calculate_stats():
     with connect() as db:
         rows = db.execute(
             """SELECT t.spell,t.area,SUM(t.procs) procs,SUM(t.combat) combat,SUM(t.seconds) seconds,COUNT(DISTINCT t.character) contributors FROM totals t JOIN snapshots s USING(character,collection) WHERE s.status='community' GROUP BY t.spell,t.area ORDER BY t.spell,t.area"""
@@ -478,12 +511,6 @@ def stats():
                 "SELECT COUNT(*) collections,COUNT(DISTINCT character) contributors,MAX(updated) updated FROM snapshots WHERE status='community'"
             ).fetchone()
         )
-        names = [
-            dict(r)
-            for r in db.execute(
-                "SELECT DISTINCT o.name,o.realm FROM owners o JOIN snapshots s ON s.character=o.character WHERE o.privacy='named' AND s.status='community' ORDER BY o.name LIMIT 100"
-            )
-        ]
     return {
         "meta": meta,
         "rows": [
@@ -503,7 +530,7 @@ def stats():
             }
             for r in rows
         ],
-        "contributors": names,
+        "contributors": [],
     }
 
 

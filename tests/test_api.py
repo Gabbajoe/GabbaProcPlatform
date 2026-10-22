@@ -534,3 +534,34 @@ def test_active_telemetry_cannot_rewrite_history(api, sample):
     sample['sequence']=2
     sample['segments'][0]['telemetry']['procTimes'][0]['atMs']=4000
     assert api.post('/api/imports',json=sample).status_code==409
+
+
+def test_storage_budget_is_transactional_and_duplicate_safe(api, sample, monkeypatch):
+    monkeypatch.setenv('GABBAPROC_ACCOUNT_BYTES', '1')
+    assert api.post('/api/imports', json=sample).status_code == 413
+    with connect() as db:
+        assert db.execute('SELECT COUNT(*) FROM snapshots').fetchone()[0] == 0
+        assert db.execute('SELECT COUNT(*) FROM storage_usage').fetchone()[0] == 0
+    monkeypatch.setenv('GABBAPROC_ACCOUNT_BYTES', '1000000')
+    assert api.post('/api/imports', json=sample).status_code == 200
+    with connect() as db:
+        before = dict(db.execute('SELECT * FROM storage_usage').fetchone())
+    assert api.post('/api/imports', json=sample).status_code == 200
+    with connect() as db:
+        assert dict(db.execute('SELECT * FROM storage_usage').fetchone()) == before
+
+
+def test_storage_budget_shared_between_account_devices(api, sample, monkeypatch):
+    monkeypatch.setenv('GABBAPROC_ACCOUNT_SEGMENTS', '1')
+    token = create_test_device()
+    with connect() as db:
+        db.execute('INSERT INTO accounts VALUES(?,?)', ('shared', int(time.time())))
+        for row in db.execute('SELECT id FROM devices').fetchall():
+            db.execute('INSERT INTO account_devices VALUES(?,?)', (row['id'], 'shared'))
+    assert api.post('/api/imports', json=sample).status_code == 200
+    second = copy.deepcopy(sample)
+    second['characterId'] = str(uuid.uuid4())
+    second['collectionId'] = str(uuid.uuid4())
+    assert api.post('/api/imports', json=second, headers={'Authorization':'Bearer '+token}).status_code == 413
+    with connect() as db:
+        assert db.execute('SELECT COUNT(*) FROM segments').fetchone()[0] == 1

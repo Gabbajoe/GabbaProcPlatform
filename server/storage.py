@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS snapshots(character TEXT NOT NULL REFERENCES owners(c
 CREATE TABLE IF NOT EXISTS totals(character TEXT NOT NULL, collection TEXT NOT NULL, spell INTEGER NOT NULL, area TEXT NOT NULL, procs INTEGER NOT NULL, combat INTEGER NOT NULL, seconds REAL NOT NULL, PRIMARY KEY(character,collection,spell,area), FOREIGN KEY(character,collection) REFERENCES snapshots(character,collection) ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS segments(character TEXT NOT NULL, collection TEXT NOT NULL, id INTEGER NOT NULL, sequence INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY(character,collection,id), FOREIGN KEY(character,collection) REFERENCES snapshots(character,collection) ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS archive_usage(character TEXT NOT NULL, collection TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY(character,collection), FOREIGN KEY(character,collection) REFERENCES snapshots(character,collection) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS storage_usage(character TEXT NOT NULL, collection TEXT NOT NULL, bytes INTEGER NOT NULL, segments INTEGER NOT NULL, PRIMARY KEY(character,collection), FOREIGN KEY(character,collection) REFERENCES snapshots(character,collection) ON DELETE CASCADE);
+CREATE INDEX IF NOT EXISTS owners_device ON owners(device);
+CREATE INDEX IF NOT EXISTS snapshots_status_updated ON snapshots(status,updated);
 CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY, created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS account_identities(provider TEXT NOT NULL, subject TEXT NOT NULL, account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, display TEXT NOT NULL, PRIMARY KEY(provider,subject));
 CREATE TABLE IF NOT EXISTS account_avatars(account TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE, mime TEXT NOT NULL, image TEXT NOT NULL);
@@ -42,6 +45,7 @@ CREATE TABLE IF NOT EXISTS account_devices(device TEXT PRIMARY KEY REFERENCES de
 CREATE TABLE IF NOT EXISTS auth_flows(hash TEXT PRIMARY KEY, binding TEXT NOT NULL, provider TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS device_links(hash TEXT PRIMARY KEY, user_code TEXT UNIQUE NOT NULL, account TEXT REFERENCES accounts(id) ON DELETE CASCADE, device TEXT REFERENCES devices(id), expires INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS device_reconnects(hash TEXT PRIMARY KEY REFERENCES device_links(hash) ON DELETE CASCADE, device TEXT NOT NULL REFERENCES devices(id));
+CREATE INDEX IF NOT EXISTS account_devices_account ON account_devices(account);
 CREATE INDEX IF NOT EXISTS account_sessions_expiry ON account_sessions(expires);
 CREATE INDEX IF NOT EXISTS auth_flows_expiry ON auth_flows(expires);
 CREATE INDEX IF NOT EXISTS device_links_expiry ON device_links(expires);
@@ -52,6 +56,7 @@ CREATE TABLE IF NOT EXISTS limits(key TEXT PRIMARY KEY, started INTEGER NOT NULL
                 " REAL", " DOUBLE PRECISION"
             )
         db.executescript(schema)
+        db.execute("INSERT INTO storage_usage SELECT s.character,s.collection,COALESCE(SUM(LENGTH(g.data)+256),0),COUNT(g.id) FROM snapshots s LEFT JOIN segments g USING(character,collection) WHERE NOT EXISTS (SELECT 1 FROM storage_usage u WHERE u.character=s.character AND u.collection=s.collection) GROUP BY s.character,s.collection ON CONFLICT(character,collection) DO NOTHING")
 
 
 def lock(db, key):

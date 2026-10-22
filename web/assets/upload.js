@@ -29,7 +29,7 @@
       const identity=packets[0];
       $('export-summary').textContent=($('export-named').checked ? `${identity.name} · ${identity.realm}`:tr('Anonymous character','Anonymer Charakter')+' '+identity.characterId.slice(0,8))+` · ${packets.length} `+tr('packets','Pakete');
       // Preview is the actual allowlisted wire payload, never the raw file.
-      $('export-preview').textContent=JSON.stringify({packets},null,2);
+      $('export-preview').textContent=JSON.stringify({packetCount:packets.length,previewPackets:packets.slice(0,1)},null,2);
       $('export-upload').disabled=false;
       show(tr('Ready. Review the preview, then upload.','Bereit. Vorschau prüfen, dann hochladen.'));
     };

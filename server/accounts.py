@@ -24,6 +24,7 @@ router = APIRouter(prefix="/api")
 COOKIE = "__Host-gabbaproc-session"
 FLOW_COOKIE = "__Host-gabbaproc-flow"
 SESSION_SECONDS = 14 * 86400
+RECENT_AUTH_SECONDS = 600
 PROVIDERS = {
     "battlenet": (
         "https://oauth.battle.net/authorize",
@@ -79,11 +80,12 @@ async def data(request):
         if len(raw) > 2048:
             raise HTTPException(413, "Request too large")
     try:
-        result = json.loads(raw)
+        from .app import unique
+        result = json.loads(raw, object_pairs_hook=unique, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
         if not isinstance(result, dict):
             raise ValueError()
         return result
-    except (ValueError, UnicodeError):
+    except (ValueError, UnicodeError, RecursionError):
         raise HTTPException(400, "Invalid request") from None
 
 
@@ -106,6 +108,17 @@ def session(request):
     if not row:
         raise HTTPException(401, "Session expired")
     return row["account"]
+
+
+def recent_session(request):
+    aid = session(request)
+    with connect() as db:
+        row = db.execute("SELECT expires FROM account_sessions WHERE hash=? AND account=?",
+                         (digest(request.cookies.get(COOKIE, "")), aid)).fetchone()
+    # Sessions have a fixed lifetime; linking must not extend this timestamp.
+    if not row or row["expires"] - SESSION_SECONDS < time.time() - RECENT_AUTH_SECONDS:
+        raise HTTPException(403, "reauth_required")
+    return aid
 
 
 def optional_session(request):
@@ -176,13 +189,20 @@ def consume(request, state, provider, code=None):
         db.commit()
     if result is None:
         raise HTTPException(400, "Invalid or expired sign-in")
-    if result.get("link") and optional_session(request) != result["link"]:
+    if result.get("link") and recent_session(request) != result["link"]:
         raise HTTPException(401, "Sign in again before linking")
     return result
 
 
 def login(request, provider, subject, display, target=None, redirect=False, avatar=None):
     token = secrets.token_urlsafe(32)
+    expires = int(time.time()) + SESSION_SECONDS
+    if target:
+        if recent_session(request) != target:
+            raise HTTPException(401, "Sign in again before linking")
+        with connect() as db:
+            expires = db.execute("SELECT expires FROM account_sessions WHERE hash=?",
+                (digest(request.cookies.get(COOKIE, "")),)).fetchone()["expires"]
     with connect() as db:
         db.execute("BEGIN IMMEDIATE")
         lock(db, "identity:" + provider + ":" + subject)
@@ -223,7 +243,7 @@ def login(request, provider, subject, display, target=None, redirect=False, avat
             db.execute("DELETE FROM account_sessions WHERE hash=?", (digest(old),))
         db.execute(
             "INSERT INTO account_sessions VALUES(?,?,?)",
-            (digest(token), account, int(time.time()) + SESSION_SECONDS),
+            (digest(token), account, expires),
         )
         db.commit()
     response = (
@@ -231,7 +251,7 @@ def login(request, provider, subject, display, target=None, redirect=False, avat
         if redirect
         else JSONResponse({"status": "signed_in"})
     )
-    cookie(response, COOKIE, token, SESSION_SECONDS)
+    cookie(response, COOKIE, token, max(0, expires - int(time.time())))
     response.delete_cookie(
         FLOW_COOKIE, path="/", secure=True, httponly=True, samesite="lax"
     )
@@ -264,7 +284,7 @@ def start_oauth(provider, request, body):
     if provider not in PROVIDERS or not configured(provider):
         raise HTTPException(404, "Provider unavailable")
     limited(request, "oauth", 20)
-    target = session(request) if body.get("link") is True else None
+    target = recent_session(request) if body.get("link") is True else None
     verifier = secrets.token_urlsafe(48)
     state, binding = flow(request, provider, {"verifier": verifier, "link": target})
     params = {
@@ -405,8 +425,8 @@ def request_email(request, body):
     from .app import rate
 
     rate("account:mail:" + digest(address), 5)
-    rate("account:mail:global", 100)
-    target = session(request) if body.get("link") is True else None
+    rate("account:mail:global", int(value("GABBAPROC_EMAILS_HOUR", "500")))
+    target = recent_session(request) if body.get("link") is True else None
     code = f"{secrets.randbelow(100000000):08d}"
     state, binding = flow(request, "email", {"email": address, "link": target})
     with connect() as db:
@@ -547,6 +567,25 @@ def logout(request: Request):
     return response
 
 
+@router.get("/account/sessions")
+def browser_sessions(request: Request):
+    aid = session(request)
+    current = digest(request.cookies.get(COOKIE, ""))
+    with connect() as db:
+        rows = db.execute("SELECT hash,expires FROM account_sessions WHERE account=? AND expires>? ORDER BY expires DESC",
+                          (aid, int(time.time()))).fetchall()
+    return {"sessions": [{"current": r["hash"] == current, "expiresAt": r["expires"]} for r in rows]}
+
+
+@router.post("/auth/logout-all")
+def logout_all(request: Request):
+    same_origin(request)
+    aid = session(request)
+    with connect() as db:
+        db.execute("DELETE FROM account_sessions WHERE account=?", (aid,))
+    return logout(request)
+
+
 def attach(db, aid, did):
     lock(db, "account:" + aid)
     if not db.execute("SELECT id FROM accounts WHERE id=?", (aid,)).fetchone():
@@ -591,7 +630,7 @@ def revoke_device(did: str, request: Request):
 @router.delete("/account")
 def delete_account(request: Request):
     same_origin(request)
-    aid = session(request)
+    aid = recent_session(request)
     from .upload_queue import cancel_jobs
 
     with connect() as db:
@@ -616,6 +655,8 @@ def delete_account(request: Request):
         db.execute("DELETE FROM device_links WHERE account=?", (aid,))
         db.execute("DELETE FROM accounts WHERE id=?", (aid,))
         db.commit()
+    from .public_cache import clear
+    clear()
     return logout(request)
 
 

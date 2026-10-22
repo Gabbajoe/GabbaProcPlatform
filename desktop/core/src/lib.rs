@@ -10,9 +10,15 @@ struct Parser<'a> {
     b: &'a [u8],
     p: usize,
     nodes: usize,
+    budget: usize,
 }
 type Result<T> = std::result::Result<T, String>;
 impl<'a> Parser<'a> {
+    fn charge(&mut self, bytes: usize) -> Result<()> {
+        self.budget = self.budget.saturating_add(bytes);
+        if self.budget > 96 * 1024 * 1024 { return Err("Export exceeds parser memory budget; source retained".into()); }
+        Ok(())
+    }
     fn ws(&mut self) {
         loop {
             while self.p < self.b.len() && self.b[self.p].is_ascii_whitespace() {
@@ -110,7 +116,8 @@ impl<'a> Parser<'a> {
     fn value(&mut self, depth: usize) -> Result<Value> {
         self.ws();
         self.nodes += 1;
-        if depth > 40 || self.nodes > 4_000_000 {
+        self.charge(96)?;
+        if depth > 40 || self.nodes > 1_000_000 {
             return Err("Export structure exceeds limits".into());
         }
         match self.b.get(self.p).copied() {
@@ -155,6 +162,7 @@ impl<'a> Parser<'a> {
                             k
                         });
                     }
+                    self.charge(key.len() + 64)?;
                     let v = self.value(depth + 1)?;
                     if table.insert(key, v).is_some() {
                         return Err("Duplicate table key".into());
@@ -167,7 +175,11 @@ impl<'a> Parser<'a> {
                 }
                 Ok(Value::Object(table))
             }
-            Some(b'"' | b'\'') => Ok(Value::String(self.string()?)),
+            Some(b'"' | b'\'') => {
+                let value = self.string()?;
+                self.charge(value.len())?;
+                Ok(Value::String(value))
+            },
             Some(b'-' | b'0'..=b'9') => {
                 let start = self.p;
                 while self.p < self.b.len()
@@ -205,6 +217,7 @@ pub fn parse(raw: &str) -> Result<Value> {
         b: raw.as_bytes(),
         p: 0,
         nodes: 0,
+        budget: 0,
     };
     if p.ident()? != "GabbaProcTrackerDB" {
         return Err("Not a GabbaProcTracker SavedVariables file".into());
