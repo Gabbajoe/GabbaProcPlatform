@@ -94,6 +94,7 @@
       (p) => !account?.identities.some((i) => i.provider === p),
     )) {
       const button = document.createElement("button");
+      button.dataset.provider = provider;
       const name = ({ github: "GitHub", discord: "Discord", battlenet: "Battle.net" })[provider] || provider;
       button.textContent = account
         ? tr("Link " + name, name + " verknüpfen")

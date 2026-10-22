@@ -1,0 +1,1 @@
+Battle.net, Discord and GitHub icons: Simple Icons (CC0), https://github.com/simple-icons/simple-icons. Original SVG files from icons/battledotnet.svg, icons/discord.svg and icons/github.svg. Brand names and logos remain trademarks of their respective owners. Email icon authored for GabbaProc.

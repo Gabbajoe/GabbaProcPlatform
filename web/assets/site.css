@@ -815,3 +815,17 @@ code {
 #account-login.embedded-login { max-width: none; }
 #email-login, #email-verify { display: flex; flex-direction: column; gap: 10px; margin: 18px 0; }
 #email-login[hidden], #email-verify[hidden] { display: none; }
+
+#provider-buttons button, #email-signin-link { position: relative; padding-left: 52px; padding-right: 52px; }
+#provider-buttons button::before, #email-signin-link::before {
+  content: ""; position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
+  width: 24px; height: 24px; background: #edf5ff;
+  mask: var(--provider-icon) center / contain no-repeat;
+  -webkit-mask: var(--provider-icon) center / contain no-repeat;
+}
+#provider-buttons [data-provider="battlenet"] { --provider-icon: url("/assets/providers/battlenet.svg"); }
+#provider-buttons [data-provider="battlenet"]::before { background: #148eff; }
+#provider-buttons [data-provider="discord"] { --provider-icon: url("/assets/providers/discord.svg"); }
+#provider-buttons [data-provider="discord"]::before { background: #8791ff; }
+#provider-buttons [data-provider="github"] { --provider-icon: url("/assets/providers/github.svg"); }
+#email-signin-link { --provider-icon: url("/assets/providers/email.svg"); }
