@@ -324,6 +324,12 @@ function renderHeaderAccount() {
     headerAccount?.username ||
     (headerAccount ? t("My account", "Mein Konto") : t("Sign in", "Anmelden"));
   accountLink.classList.toggle("signed-in", !!headerAccount);
+  const navLabel = document.querySelector('aside nav a[href="/account.html"] span');
+  if (navLabel) {
+    navLabel.dataset.en = headerAccount ? "My account" : "Sign in";
+    navLabel.dataset.de = headerAccount ? "Mein Konto" : "Anmelden";
+    navLabel.textContent = t(navLabel.dataset.en, navLabel.dataset.de);
+  }
 }
 window.addEventListener("gabbaproc-account", (event) => {
   headerAccount = event.detail;

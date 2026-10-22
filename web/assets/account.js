@@ -81,6 +81,7 @@
   }
   function render() {
     el("signed-account").hidden = !account;
+    el("account-description").hidden = !account;
     const login = el("account-login");
     if (account) {
       if (login.parentElement !== el("account-method-slot"))
