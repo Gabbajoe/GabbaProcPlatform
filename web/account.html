@@ -9,9 +9,9 @@
     />
     <title>GabbaProc · My account</title>
     <link rel="icon" href="/assets/logo.png" />
-    <link rel="stylesheet" href="/assets/site.css?v=e7b54c0aa13f" />
+    <link rel="stylesheet" href="/assets/site.css?v=91937a3dadf5" />
     <script src="/assets/site.js?v=1a2e4f06ab86" defer></script>
-    <script src="/assets/account.js?v=c17b9a869c06" defer></script>
+    <script src="/assets/account.js?v=d13249687ba3" defer></script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
@@ -68,7 +68,7 @@
           >
         </nav>
       </aside>
-      <main id="main">
+      <main id="main" class="signin-layout">
         <div class="page-heading">
           <h1 id="account-heading" data-en="Sign in" data-de="Anmelden">Sign in</h1>
           <p id="account-description" hidden
@@ -79,6 +79,7 @@
           </p>
         </div>
         <section class="panel account-panel" id="account-login">
+          <img class="signin-logo" src="/assets/logo.png" alt="" width="64" height="64" />
           <h2
             data-de="Anmelden oder Konto anlegen"
             data-en="Sign in or create an account"
@@ -88,7 +89,7 @@
 
           <div id="provider-buttons"></div>
           <a id="email-signin-link" class="button" href="/signin-email.html" hidden data-en="Sign in with email" data-de="Mit E-Mail anmelden">Sign in with email</a>
-        <p id="signup-toggle"><a id="signup-link" href="/account.html?mode=signup">New here? Create an account</a></p>
+        <p id="signup-toggle"><span id="signup-prompt">New here?</span> <a id="signup-link" href="/account.html?mode=signup">Create an account</a></p>
         </section>
         <p id="account-status" role="status" aria-live="polite"></p>
         <section id="signed-account" hidden>

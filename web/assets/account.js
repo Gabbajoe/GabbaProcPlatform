@@ -81,6 +81,7 @@
   }
   function render() {
     el("signed-account").hidden = !account;
+    el("main").classList.toggle("signin-layout", !account);
     el("account-description").hidden = !account;
     const login = el("account-login");
     if (account) {
@@ -132,7 +133,8 @@
     el("signup-toggle").hidden = !!account;
     const switchLink = el("signup-link");
     switchLink.href = signup ? "/account.html" : "/account.html?mode=signup";
-    switchLink.textContent = signup ? tr("Already have an account? Sign in", "Schon ein Konto? Anmelden") : tr("New here? Create an account", "Noch kein Konto? Konto erstellen");
+    el("signup-prompt").textContent = signup ? tr("Already have an account?", "Schon ein Konto?") : tr("New here?", "Noch kein Konto?");
+    switchLink.textContent = signup ? tr("Sign in", "Anmelden") : tr("Create an account", "Konto erstellen");
     if (!account) return;
     const pending = pendingPairing();
     el("account-name").textContent =
