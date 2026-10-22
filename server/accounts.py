@@ -359,7 +359,7 @@ def send_code(address, code, state):
     # Fragments stay in the browser: codes do not enter HTTP requests or access logs.
     link = (
         origin()
-        + "/account.html#"
+        + "/signin-email.html#"
         + urlencode(
             {"emailChallenge": state, "emailCode": code, "emailAddress": address}
         )

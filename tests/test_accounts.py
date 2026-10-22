@@ -447,6 +447,7 @@ def test_email_html_link_and_plaintext(monkeypatch):
     parsed = urlparse(link)
     assert not parsed.query
     assert parsed.netloc == "gabbaproc.kellerkind.info"
+    assert parsed.path == "/signin-email.html"
     assert parse_qs(parsed.fragment) == {
         "emailChallenge": ["A" * 43],
         "emailCode": ["01234567"],

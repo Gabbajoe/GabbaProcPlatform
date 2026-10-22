@@ -1,8 +1,8 @@
 "use strict";
 (() => {
   let account = null,
-    challenge = null,
     available = [];
+  const signup = new URLSearchParams(location.search).get("mode") === "signup";
   const el = (id) => document.getElementById(id);
   const tr = (en, de) => (document.documentElement.lang === "de" ? de : en);
   const status = (en, de) => {
@@ -39,29 +39,6 @@
       el("pair-code").value = code;
     }
     history.replaceState(null, "", location.pathname + location.search);
-  }
-  if (emailLink.has("emailChallenge") || emailLink.has("emailCode")) {
-    // Remove secrets from the current history entry before any API call.
-    history.replaceState(null, "", location.pathname + location.search);
-    const linkedChallenge = emailLink.get("emailChallenge") || "";
-    const linkedCode = emailLink.get("emailCode") || "";
-    if (
-      /^[A-Za-z0-9_-]{43}$/.test(linkedChallenge) &&
-      /^[0-9]{8}$/.test(linkedCode)
-    ) {
-      challenge = linkedChallenge;
-      el("email-verify").hidden = false;
-      el("login-code").value = linkedCode;
-      const linkedAddress = emailLink.get("emailAddress") || "";
-      if (linkedAddress.length <= 254) {
-        el("login-email").value = linkedAddress;
-        if (!el("login-email").checkValidity()) el("login-email").value = "";
-      }
-      status(
-        "Code filled in. Confirm it below in the browser where you requested it.",
-        "Code eingefügt. Bitte unten in dem Browser bestätigen, in dem du ihn angefordert hast.",
-      );
-    }
   }
   async function request(path, method = "GET", body, headers = {}) {
     const r = await fetch("/api" + path, {
@@ -111,8 +88,6 @@
       login.classList.add("embedded-login");
       login.querySelector("h2").hidden = true;
       for (const p of login.querySelectorAll(":scope > p")) p.hidden = true;
-      if (challenge) el("account-methods").open = true;
-      el("existing-invite").hidden = true;
     }
     el("provider-buttons").replaceChildren();
     for (const provider of available.filter(
@@ -122,7 +97,7 @@
       const name = ({ github: "GitHub", discord: "Discord", battlenet: "Battle.net" })[provider] || provider;
       button.textContent = account
         ? tr("Link " + name, name + " verknüpfen")
-        : tr("Sign in with " + name, "Mit " + name + " anmelden");
+        : signup ? tr("Sign up with " + name, "Mit " + name + " registrieren") : tr("Sign in with " + name, "Mit " + name + " anmelden");
       button.onclick = () =>
         action(button, async () => {
           const r = await request("/auth/" + provider + "/start", "POST", {
@@ -132,6 +107,30 @@
         });
       el("provider-buttons").append(button);
     }
+    const emailButton = el("email-signin-link");
+    emailButton.href = account ? "/signin-email.html?link=1" : "/signin-email.html";
+    emailButton.dataset.en = account ? "Link email" : "Sign in with email";
+    emailButton.dataset.de = account ? "E-Mail verknüpfen" : "Mit E-Mail anmelden";
+    emailButton.textContent = tr(emailButton.dataset.en, emailButton.dataset.de);
+    const heading = el("account-heading");
+    heading.dataset.en = account ? "My account" : "Sign in";
+    heading.dataset.de = account ? "Mein Konto" : "Anmelden";
+    heading.textContent = tr(heading.dataset.en, heading.dataset.de);
+    if (!account && signup) {
+      heading.dataset.en = "Create a GabbaProc account"; heading.dataset.de = "GabbaProc-Konto erstellen";
+      heading.textContent = tr(heading.dataset.en, heading.dataset.de);
+      emailButton.href = "/signin-email.html?mode=signup";
+      emailButton.dataset.en = "Sign up with email"; emailButton.dataset.de = "Mit E-Mail registrieren";
+      emailButton.textContent = tr(emailButton.dataset.en, emailButton.dataset.de);
+    }
+    const loginTitle = login.querySelector("h2");
+    loginTitle.dataset.en = signup ? "Create your account" : "Welcome to GabbaProc";
+    loginTitle.dataset.de = signup ? "Erstelle dein Konto" : "Willkommen bei GabbaProc";
+    loginTitle.textContent = tr(loginTitle.dataset.en, loginTitle.dataset.de);
+    el("signup-toggle").hidden = !!account;
+    const switchLink = el("signup-link");
+    switchLink.href = signup ? "/account.html" : "/account.html?mode=signup";
+    switchLink.textContent = signup ? tr("Already have an account? Sign in", "Schon ein Konto? Anmelden") : tr("New here? Create an account", "Noch kein Konto? Konto erstellen");
     if (!account) return;
     const pending = pendingPairing();
     el("account-name").textContent =
@@ -233,37 +232,6 @@
       status("Username saved.", "Benutzername gespeichert.");
     });
   };
-  el("email-login").onsubmit = (event) => {
-    event.preventDefault();
-    action(event.submitter, async () => {
-      const r = await request("/auth/email/request", "POST", {
-        email: el("login-email").value.trim(),
-        link: !!account,
-      });
-      challenge = r.challenge;
-      el("email-verify").hidden = false;
-      el("login-code").value = "";
-      el("login-code").focus();
-      status(
-        "Code sent. Check your inbox and spam folder.",
-        "Code versendet. Bitte Posteingang und Spamordner prüfen.",
-      );
-    });
-  };
-  el("email-verify").onsubmit = (event) => {
-    event.preventDefault();
-    action(event.submitter, async () => {
-      await request("/auth/email/verify", "POST", {
-        challenge,
-        code: el("login-code").value.trim(),
-      });
-      challenge = null;
-      el("login-code").value = "";
-      el("email-verify").hidden = true;
-      await refresh();
-      status("Signed in.", "Angemeldet.");
-    });
-  };
   el("account-logout").onclick = (event) =>
     action(event.target, async () => {
       await request("/auth/logout", "POST");
@@ -338,12 +306,12 @@
   (async () => {
     const config = await request("/auth/options");
     available = config.providers;
-    el("email-login").hidden = !config.email;
+    el("email-signin-link").hidden = !config.email;
     await refresh();
     if (!available.length && !config.email)
       status(
-        "Sign-in is currently unavailable. Existing invitations still work.",
-        "Anmeldung derzeit nicht verfügbar. Bestehende Einladungen funktionieren weiterhin.",
+        "Sign-in is currently unavailable. Please try again later.",
+        "Anmeldung derzeit nicht verfügbar. Bitte später erneut versuchen.",
       );
     if (new URLSearchParams(location.search).get("auth") === "failed")
       status(

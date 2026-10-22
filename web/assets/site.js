@@ -310,51 +310,10 @@ if ($("csv"))
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-if ($("enroll"))
-  $("enroll").onsubmit = async (event) => {
-    event.preventDefault();
-    const button = event.submitter;
-    button.disabled = true;
-    try {
-      const response = await fetch("/api/enroll", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ invite: $("invite").value }),
-      });
-      if (!response.ok) throw Error();
-      const data = await response.json();
-      $("token").value = data.token;
-      $("token-box").hidden = false;
-      $("invite").value = "";
-      $("enroll-status").textContent = t(
-        "Token created. Store it in the companion.",
-        "Token erstellt. In der Companion-App speichern.",
-      );
-    } catch {
-      $("enroll-status").textContent = t(
-        "Invitation unavailable or expired. Please try again later.",
-        "Einladung nicht verfügbar oder abgelaufen. Bitte später erneut versuchen.",
-      );
-    } finally {
-      button.disabled = false;
-    }
-  };
-if ($("copy-token"))
-  $("copy-token").onclick = async () => {
-    try {
-      await navigator.clipboard.writeText($("token").value);
-      $("enroll-status").textContent = t(
-        "Copied. Keep this token private.",
-        "Kopiert. Diesen Token vertraulich behandeln.",
-      );
-    } catch {
-      $("token").select();
-    }
-  };
 translate();
 if ($("refresh")) refresh();
 
-// Account display is private browser state, never part of the public dataset.
+// Account display is private browser state.
 let headerAccount = null;
 const accountLink = document.createElement("a");
 accountLink.id = "header-account";

@@ -9,9 +9,9 @@
     />
     <title>GabbaProc · My account</title>
     <link rel="icon" href="/assets/logo.png" />
-    <link rel="stylesheet" href="/assets/site.css?v=5ee6dac50b06" />
-    <script src="/assets/site.js?v=e345e7368ca2" defer></script>
-    <script src="/assets/account.js?v=0f28c1b0fdab" defer></script>
+    <link rel="stylesheet" href="/assets/site.css?v=e76a319f3024" />
+    <script src="/assets/site.js?v=773c034adacc" defer></script>
+    <script src="/assets/account.js?v=84b574743ad6" defer></script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
@@ -70,7 +70,7 @@
       </aside>
       <main id="main">
         <div class="page-heading">
-          <h1 data-en="My account" data-de="Mein Konto">My account</h1>
+          <h1 id="account-heading" data-en="My account" data-de="Mein Konto">My account</h1>
           <p
             data-en="Manage access to your contributions."
             data-de="Zugang zu deinen Beiträgen verwalten."
@@ -85,62 +85,16 @@
           >
             Sign in or create an account
           </h2>
-          <p
-            data-de="Melde dich mit Discord, GitHub, Battle.net oder einem Einmalcode per E-Mail an. Zusätzliche Anmeldemethoden kannst du nach der Anmeldung verknüpfen."
-            data-en="Sign in with Discord, GitHub, Battle.net or an email code. You can link additional sign-in methods after signing in."
-          >
-            Sign in with Discord, GitHub, Battle.net or an email code. You can link
-            additional sign-in methods after signing in.
-          </p>
+
           <div id="provider-buttons"></div>
-          <form id="email-login">
-            <label
-              for="login-email"
-              data-de="E-Mail-Adresse"
-              data-en="Email address"
-              >Email address</label
-            ><input
-              id="login-email"
-              type="email"
-              autocomplete="email"
-              required
-              maxlength="254"
-            /><button
-              type="submit"
-              data-de="Anmeldecode senden"
-              data-en="Send sign-in code"
-            >
-              Send sign-in code
-            </button>
-          </form>
-          <form id="email-verify" hidden>
-            <label
-              for="login-code"
-              data-de="Achtstelliger Code (10 Minuten gültig)"
-              data-en="Eight-digit code (valid for 10 minutes)"
-              >Eight-digit code (valid for 10 minutes)</label
-            ><input
-              id="login-code"
-              inputmode="numeric"
-              autocomplete="one-time-code"
-              pattern="[0-9]{8}"
-              maxlength="8"
-              required
-            /><button
-              type="submit"
-              data-de="Code bestätigen"
-              data-en="Verify code"
-            >
-              Verify code
-            </button>
-          </form>
+          <a id="email-signin-link" class="button" href="/signin-email.html" hidden data-en="Sign in with email" data-de="Mit E-Mail anmelden">Sign in with email</a>
           <p
-            data-de="Durch die Anmeldung legst du beim ersten Mal ein Konto an. Gleiche E-Mail-Adressen bei verschiedenen Anbietern führen nicht automatisch zu einem gemeinsamen Konto."
-            data-en="Your first sign-in creates an account. Matching email addresses at different providers do not automatically merge accounts."
+            data-de="Bei deiner ersten Anmeldung wird ein Konto erstellt."
+            data-en="Your first sign-in creates an account."
           >
-            Your first sign-in creates an account. Matching email addresses at
-            different providers do not automatically merge accounts.
+            Your first sign-in creates an account.
           </p>
+        <p id="signup-toggle"><a id="signup-link" href="/account.html?mode=signup">New here? Create an account</a></p>
         </section>
         <p id="account-status" role="status" aria-live="polite"></p>
         <section id="signed-account" hidden>
@@ -356,45 +310,6 @@
             </details>
           </div>
         </section>
-        <details class="panel" id="existing-invite">
-          <summary>
-            <span
-              data-en="Activate an existing invitation"
-              data-de="Vorhandene Einladung aktivieren"
-              >Activate an existing invitation</span
-            >
-          </summary>
-          <p
-            data-en="For the existing pilot: exchange your operator invitation for a device token."
-            data-de="Für den bestehenden Pilotbetrieb: Tausche deine Betreiber-Einladung gegen einen Geräte-Token."
-          >
-            For the existing pilot: exchange your operator invitation for a
-            device token.
-          </p>
-          <form id="enroll">
-            <label
-              ><span data-en="Invitation" data-de="Einladung">Invitation</span
-              ><input
-                id="invite"
-                type="password"
-                maxlength="100"
-                autocomplete="off"
-                required /></label
-            ><button type="submit">
-              <span data-en="Activate" data-de="Aktivieren">Activate</span>
-            </button>
-          </form>
-          <p id="enroll-status" role="status"></p>
-          <div id="token-box" hidden>
-            <label
-              ><span data-en="Upload token" data-de="Upload-Token"
-                >Upload token</span
-              ><input id="token" readonly autocomplete="off" /></label
-            ><button id="copy-token">
-              <span data-en="Copy" data-de="Kopieren">Copy</span>
-            </button>
-          </div>
-        </details>
       </main>
     </div>
     <footer>

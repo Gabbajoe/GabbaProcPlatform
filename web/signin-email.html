@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Community proc measurements for WoW Classic Era and Hardcore. Compare observed effects across Open World, dungeons and raids."
+    />
+    <title>GabbaProc · Email sign-in</title>
+    <link rel="icon" href="/assets/logo.png" />
+    <link rel="stylesheet" href="/assets/site.css?v=e76a319f3024" />
+    <script src="/assets/site.js?v=773c034adacc" defer></script>
+    <script src="/assets/signin-email.js?v=d347d2e67ced" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="masthead">
+      <a class="brand" href="/"
+        ><img src="/assets/logo.png" alt="" width="36" height="36" /><span class="brand-copy"><b>Gabba<span class="brand-proc">Proc</span></b><small>Count the sparks!</small></span></a
+      ><span class="edition">CLASSIC ERA / HARDCORE</span>
+      <div id="language" role="group" aria-label="Language / Sprache">
+        <button
+          type="button"
+          data-language="de"
+          aria-label="Deutsch"
+          aria-pressed="false"
+        >
+          DE</button
+        ><button
+          type="button"
+          data-language="en"
+          aria-label="English"
+          aria-pressed="false"
+        >
+          EN
+        </button>
+      </div>
+    </header>
+    <div class="layout">
+      <aside>
+        <nav aria-label="Main">
+          <a href="/"
+            ><span data-en="Observations" data-de="Messwerte"
+              >Observations</span
+            ></a
+          ><a href="/compare.html"
+            ><span data-en="Compare effects" data-de="Effekte vergleichen"
+              >Compare effects</span
+            ></a
+          ><a href="/analysis.html"><span data-en="Combat analysis" data-de="Kampfauswertung">Combat analysis</span></a>
+          <a href="/quality.html"
+            ><span
+              data-en="Method &amp; data quality"
+              data-de="Methodik &amp; Datenqualität"
+              >Method &amp; data quality</span
+            ></a
+          ><a href="/downloads.html"
+            ><span
+              data-en="Addon &amp; companion"
+              data-de="Addon &amp; Companion"
+              >Addon &amp; companion</span
+            ></a
+          ><a href="/upload.html"><span data-en="Upload export" data-de="Export hochladen">Upload export</span></a><a href="/account.html" aria-current="page"
+            ><span data-en="My account" data-de="Mein Konto"
+              >My account</span
+            ></a
+          >
+        </nav>
+      </aside>
+      <main id="main">
+        <h1 data-en="Sign in with email" data-de="Mit E-Mail anmelden">Sign in with email</h1>
+        <section class="panel account-panel">
+          <p data-en="We will email you a sign-in link and a one-time code. No password needed." data-de="Wir schicken dir einen Anmeldelink und einen Einmalcode per E-Mail. Du brauchst kein Passwort.">We will email you a sign-in link and a one-time code. No password needed.</p>
+          <form id="email-login">
+            <label
+              for="login-email"
+              data-de="E-Mail-Adresse"
+              data-en="Email address"
+              >Email address</label
+            ><input
+              id="login-email"
+              type="email"
+              autocomplete="email"
+              required
+              maxlength="254"
+            /><button
+              type="submit"
+              data-de="Anmeldecode senden"
+              data-en="Send sign-in code"
+            >
+              Send sign-in code
+            </button>
+          </form>
+          <form id="email-verify" hidden>
+            <label
+              for="login-code"
+              data-de="Achtstelliger Code (10 Minuten gültig)"
+              data-en="Eight-digit code (valid for 10 minutes)"
+              >Eight-digit code (valid for 10 minutes)</label
+            ><input
+              id="login-code"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              pattern="[0-9]{8}"
+              maxlength="8"
+              required
+            /><button
+              type="submit"
+              data-de="Code bestätigen"
+              data-en="Verify code"
+            >
+              Verify code
+            </button>
+          </form>
+          <p id="email-status" role="status" aria-live="polite"></p>
+          <a href="/account.html" data-en="Back to sign-in options" data-de="Zurück zu den Anmeldeoptionen">Back to sign-in options</a>
+        </section>
+      </main>
+    </div>
+    <footer>
+      <a href="/about.html"><span data-en="About GabbaProc" data-de="Über GabbaProc">About GabbaProc</span></a
+      ><a href="/privacy.html"
+        ><span data-en="Privacy notice" data-de="Datenschutz"
+          >Privacy notice</span
+        ></a
+      ><a
+        href="mailto:gabbaproc@kellerkind.info"
+        data-en="Contact"
+        data-de="Kontakt"
+        >Contact</a
+      ><a href="/imprint.html"
+        ><span data-en="Legal notice" data-de="Impressum">Legal notice</span></a
+      >
+    </footer>
+  </body>
+</html>
