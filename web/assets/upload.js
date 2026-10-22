@@ -7,8 +7,7 @@
   function renderAccount() {
     const account=window.gabbaprocAccount;
     $('export-signin').hidden=!window.gabbaprocAccountReady || !!account;
-    $('export-account').hidden=!account;
-    $('export-account').textContent=account ? (account.username ? tr('Signed in as ','Angemeldet als ')+account.username : tr('Signed in — ready to upload.','Angemeldet — bereit zum Hochladen.')) : '';
+    $('export-form').hidden=!window.gabbaprocAccountReady || !account;
   }
   window.addEventListener('gabbaproc-account',renderAccount);
   new MutationObserver(renderAccount).observe(document.documentElement,{attributes:true,attributeFilter:['lang']});
